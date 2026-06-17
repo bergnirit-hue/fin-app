@@ -92,7 +92,7 @@ export default function Dashboard() {
         <title>Dashboard - FinFlow</title>
       </Head>
 
-      <div className="space-y-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
         {/* Header with gradient */}
         <div className="mb-8">
           <h1 className="text-5xl font-black mb-2 bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
