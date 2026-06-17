@@ -42,35 +42,38 @@ export default function Settings() {
       <div className="space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent mb-2">
+          <h1 className="text-5xl font-black mb-3 bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
             Settings
           </h1>
-          <p className="text-slate-400">
-            Manage your account and preferences
+          <p className="text-slate-400 text-lg">
+            Manage your account, preferences, and integrations
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar Navigation */}
           <div className="lg:col-span-1">
-            <div className="bg-slate-700/50 backdrop-blur border border-slate-600 rounded-lg overflow-hidden">
-              <nav className="flex flex-col">
+            <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl overflow-hidden shadow-lg">
+              <nav className="flex flex-col divide-y divide-slate-700/50">
                 {[
-                  { id: 'general', label: 'General' },
-                  { id: 'household', label: 'Household' },
-                  { id: 'categories', label: 'Categories' },
-                  { id: 'notifications', label: 'Notifications' },
+                  { id: 'general', label: 'General', icon: '⚙️' },
+                  { id: 'household', label: 'Household', icon: '👥' },
+                  { id: 'categories', label: 'Categories', icon: '📂' },
+                  { id: 'notifications', label: 'Notifications', icon: '🔔' },
                 ].map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`text-left px-6 py-3 font-medium transition border-l-4 ${
+                    className={`text-left px-6 py-4 font-semibold transition-all duration-200 ${
                       activeTab === tab.id
-                        ? 'bg-emerald-600/20 text-emerald-400 border-emerald-400'
-                        : 'text-slate-300 hover:bg-slate-600/30 border-transparent'
+                        ? 'bg-gradient-to-r from-emerald-600/20 to-emerald-600/5 text-emerald-400 border-l-4 border-emerald-400'
+                        : 'text-slate-300 hover:bg-slate-600/30 border-l-4 border-transparent'
                     }`}
                   >
-                    {tab.label}
+                    <span className="flex items-center gap-3">
+                      <span className="text-lg">{tab.icon}</span>
+                      {tab.label}
+                    </span>
                   </button>
                 ))}
               </nav>
@@ -81,186 +84,197 @@ export default function Settings() {
           <div className="lg:col-span-3">
             {/* General Settings */}
             {activeTab === 'general' && (
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600 rounded-lg p-8 space-y-6">
-                <h2 className="text-2xl font-bold text-white mb-6">
-                  General Settings
-                </h2>
-
+              <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl p-8 space-y-6 shadow-lg">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={user?.email || ''}
+                  <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                    <span>⚙️</span> General Settings
+                  </h2>
+                  <p className="text-slate-400">Customize your app experience</p>
+                </div>
+
+                <div className="space-y-5 pt-4">
+                  <SettingField
+                    label="Email Address"
+                    icon="📧"
                     disabled
-                    className="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-slate-400 cursor-not-allowed"
+                    value={user?.email || ''}
+                  />
+
+                  <SettingSelect
+                    label="Preferred Currency"
+                    icon="💱"
+                    options={[
+                      { value: 'usd', label: 'USD ($)' },
+                      { value: 'eur', label: 'EUR (€)' },
+                      { value: 'gbp', label: 'GBP (£)' },
+                      { value: 'ils', label: 'ILS (₪)' },
+                    ]}
+                  />
+
+                  <SettingSelect
+                    label="Date Format"
+                    icon="📅"
+                    options={[
+                      { value: 'mmddyyyy', label: 'MM/DD/YYYY' },
+                      { value: 'ddmmyyyy', label: 'DD/MM/YYYY' },
+                      { value: 'yyyymmdd', label: 'YYYY-MM-DD' },
+                    ]}
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Preferred Currency
-                  </label>
-                  <select className="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                    <option>USD ($)</option>
-                    <option>EUR (€)</option>
-                    <option>GBP (£)</option>
-                    <option>ILS (₪)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Date Format
-                  </label>
-                  <select className="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                    <option>MM/DD/YYYY</option>
-                    <option>DD/MM/YYYY</option>
-                    <option>YYYY-MM-DD</option>
-                  </select>
-                </div>
-
-                <button className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition">
-                  Save Changes
+                <button className="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 mt-6">
+                  💾 Save Changes
                 </button>
               </div>
             )}
 
             {/* Household Settings */}
             {activeTab === 'household' && (
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600 rounded-lg p-8 space-y-6">
-                <h2 className="text-2xl font-bold text-white mb-6">
-                  Household Settings
-                </h2>
-
-                <div className="bg-slate-600/50 border border-slate-500 rounded-lg p-6">
-                  <h3 className="text-lg font-bold text-white mb-4">
-                    Invite Your Spouse
+              <div className="space-y-6">
+                <div className="bg-gradient-to-br from-emerald-600/20 to-emerald-600/5 backdrop-blur border border-emerald-500/30 rounded-2xl p-8 shadow-lg">
+                  <h3 className="text-2xl font-bold text-white mb-3 flex items-center gap-2">
+                    <span>👥</span> Invite Your Spouse
                   </h3>
-                  <p className="text-slate-400 mb-4">
-                    Create a shared household account to view combined finances
+                  <p className="text-slate-400 mb-6">
+                    Create a shared household account to view combined finances and sync spending data
                   </p>
 
                   <form onSubmit={handleInviteSpouse} className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
-                        Spouse Email
+                      <label className="block text-sm font-semibold text-slate-300 mb-3">
+                        Spouse Email Address
                       </label>
                       <input
                         type="email"
                         value={inviteEmail}
                         onChange={(e) => setInviteEmail(e.target.value)}
                         placeholder="spouse@example.com"
-                        className="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-5 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
                         required
                       />
                     </div>
                     <button
                       type="submit"
-                      className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition"
+                      className="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
                     >
-                      Send Invite
+                      📨 Send Invite
                     </button>
                   </form>
                 </div>
 
-                <div className="bg-slate-600/50 border border-slate-500 rounded-lg p-6">
-                  <h3 className="text-lg font-bold text-white mb-4">
-                    Household Members
+                <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl p-8 shadow-lg">
+                  <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                    <span>👫</span> Household Members
                   </h3>
-                  <p className="text-slate-400 text-sm">
-                    Only you for now. Add a spouse to get started!
-                  </p>
+                  <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600/50">
+                    <p className="text-slate-400 text-center py-6">
+                      📌 Only you for now. Invite your spouse to get started!
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Categories Settings */}
             {activeTab === 'categories' && (
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600 rounded-lg p-8 space-y-6">
-                <h2 className="text-2xl font-bold text-white mb-6">
-                  Category Rules
-                </h2>
-                <p className="text-slate-400 mb-6">
-                  Customize how transactions are automatically categorized
-                </p>
+              <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl p-8 space-y-6 shadow-lg">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                    <span>📂</span> Category Rules
+                  </h2>
+                  <p className="text-slate-400">Customize how transactions are automatically categorized</p>
+                </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3 pt-4">
                   {[
-                    { merchant: 'Starbucks', category: 'Dining' },
-                    { merchant: 'Whole Foods', category: 'Groceries' },
-                    { merchant: 'Netflix', category: 'Subscriptions' },
+                    { merchant: 'Starbucks', category: 'Dining', icon: '☕' },
+                    { merchant: 'Whole Foods', category: 'Groceries', icon: '🥬' },
+                    { merchant: 'Netflix', category: 'Subscriptions', icon: '🎬' },
                   ].map((rule, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between p-4 bg-slate-600/50 rounded-lg border border-slate-500"
+                      className="flex items-center justify-between p-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-xl border border-slate-600/50 transition-all group"
                     >
-                      <div>
-                        <p className="text-white font-medium">{rule.merchant}</p>
-                        <p className="text-slate-400 text-sm">
-                          → {rule.category}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{rule.icon}</span>
+                        <div>
+                          <p className="text-white font-semibold">{rule.merchant}</p>
+                          <p className="text-slate-400 text-sm">
+                            → {rule.category}
+                          </p>
+                        </div>
                       </div>
-                      <button className="text-slate-400 hover:text-red-400 transition">
+                      <button className="text-slate-400 hover:text-rose-400 transition opacity-0 group-hover:opacity-100 text-xl">
                         ✕
                       </button>
                     </div>
                   ))}
                 </div>
 
-                <button className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition">
-                  Add New Rule
+                <button className="w-full px-6 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 mt-4">
+                  ➕ Add New Rule
                 </button>
               </div>
             )}
 
             {/* Notifications Settings */}
             {activeTab === 'notifications' && (
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600 rounded-lg p-8 space-y-6">
-                <h2 className="text-2xl font-bold text-white mb-6">
-                  Notifications
-                </h2>
+              <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl p-8 space-y-6 shadow-lg">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                    <span>🔔</span> Notification Preferences
+                  </h2>
+                  <p className="text-slate-400">Choose what notifications you'd like to receive</p>
+                </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3 pt-4">
                   {[
                     {
                       name: 'Budget Alerts',
                       description: 'Notify when spending exceeds budget',
+                      icon: '⚠️',
                     },
                     {
                       name: 'Weekly Summary',
                       description: 'Get a weekly summary of your spending',
+                      icon: '📊',
                     },
                     {
                       name: 'New Transactions',
-                      description:
-                        'Notify when new transactions are imported',
+                      description: 'Notify when new transactions are imported',
+                      icon: '📥',
                     },
                   ].map((notif, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between p-4 bg-slate-600/50 rounded-lg border border-slate-500"
+                      className="flex items-center justify-between p-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-xl border border-slate-600/50 transition-all"
                     >
-                      <div>
-                        <p className="text-white font-medium">{notif.name}</p>
-                        <p className="text-slate-400 text-sm">
-                          {notif.description}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{notif.icon}</span>
+                        <div>
+                          <p className="text-white font-semibold">{notif.name}</p>
+                          <p className="text-slate-400 text-sm">
+                            {notif.description}
+                          </p>
+                        </div>
                       </div>
                       <label className="flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          defaultChecked
-                          className="rounded"
-                        />
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            defaultChecked
+                            className="sr-only"
+                          />
+                          <div className="w-10 h-6 bg-emerald-600 rounded-full shadow-inner"></div>
+                          <div className="absolute left-1 top-1 bg-white w-4 h-4 rounded-full shadow transition-transform"></div>
+                        </div>
                       </label>
                     </div>
                   ))}
                 </div>
 
-                <button className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition">
-                  Save Preferences
+                <button className="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 mt-6">
+                  💾 Save Preferences
                 </button>
               </div>
             )}
@@ -268,5 +282,56 @@ export default function Settings() {
         </div>
       </div>
     </>
+  );
+}
+
+function SettingField({
+  label,
+  icon,
+  value,
+  disabled,
+}: {
+  label: string;
+  icon: string;
+  value: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+        <span>{icon}</span> {label}
+      </label>
+      <input
+        type="text"
+        value={value}
+        disabled={disabled}
+        className="w-full px-5 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-slate-400 cursor-not-allowed focus:outline-none"
+      />
+    </div>
+  );
+}
+
+function SettingSelect({
+  label,
+  icon,
+  options,
+}: {
+  label: string;
+  icon: string;
+  options: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+        <span>{icon}</span> {label}
+      </label>
+      <select className="w-full px-5 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }

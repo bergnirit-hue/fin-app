@@ -137,36 +137,37 @@ export default function Transactions() {
       <div className="space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent mb-2">
+          <h1 className="text-5xl font-black mb-3 bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
             Transactions
           </h1>
-          <p className="text-slate-400">
-            Review and manage your transactions
+          <p className="text-slate-400 text-lg">
+            Review, filter, and manage your transactions
           </p>
         </div>
 
         {/* Filters */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Search */}
-          <div>
+          <div className="relative">
             <input
               type="text"
               placeholder="Search by merchant..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-5 py-3 pl-12 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
             />
+            <span className="absolute left-4 top-3.5 text-xl">🔍</span>
           </div>
 
           {/* Category Filter */}
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="px-5 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
           >
             {categories.map((cat) => (
               <option key={cat} value={cat}>
-                {cat === 'all' ? 'All Categories' : cat}
+                {cat === 'all' ? '📊 All Categories' : cat}
               </option>
             ))}
           </select>
@@ -179,79 +180,84 @@ export default function Transactions() {
                 e.target.value as 'all' | 'must_have' | 'luxury'
               )
             }
-            className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="px-5 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
           >
-            <option value="all">All Types</option>
-            <option value="must_have">Must-Have</option>
-            <option value="luxury">Luxury</option>
+            <option value="all">🔹 All Types</option>
+            <option value="must_have">🏠 Must-Have</option>
+            <option value="luxury">✨ Luxury</option>
           </select>
         </div>
 
         {/* Transactions Table */}
-        <div className="bg-slate-700/50 backdrop-blur border border-slate-600 rounded-lg overflow-hidden">
+        <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl overflow-hidden shadow-xl">
           {filteredTransactions.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-slate-400">No transactions found</p>
+            <div className="p-12 text-center">
+              <p className="text-4xl mb-3">🚫</p>
+              <p className="text-slate-400 text-lg">No transactions found</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-600/50 border-b border-slate-600">
+                <thead className="bg-slate-700/50 border-b border-slate-600/50">
                   <tr>
-                    <th className="text-left px-6 py-4 font-semibold text-slate-300">
-                      Date
+                    <th className="text-left px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
+                      📅 Date
                     </th>
-                    <th className="text-left px-6 py-4 font-semibold text-slate-300">
-                      Merchant
+                    <th className="text-left px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
+                      🛍️ Merchant
                     </th>
-                    <th className="text-right px-6 py-4 font-semibold text-slate-300">
-                      Amount
+                    <th className="text-right px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
+                      💵 Amount
                     </th>
-                    <th className="text-left px-6 py-4 font-semibold text-slate-300">
-                      Category
+                    <th className="text-left px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
+                      📂 Category
                     </th>
-                    <th className="text-left px-6 py-4 font-semibold text-slate-300">
-                      Type
+                    <th className="text-left px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
+                      🏷️ Type
                     </th>
-                    <th className="text-left px-6 py-4 font-semibold text-slate-300">
-                      Source
+                    <th className="text-left px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
+                      📍 Source
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-600">
+                <tbody className="divide-y divide-slate-700/50">
                   {filteredTransactions.map((tx) => (
                     <tr
                       key={tx.id}
-                      className="hover:bg-slate-600/30 transition"
+                      className="hover:bg-slate-600/30 transition-colors"
                     >
                       <td className="px-6 py-4 text-slate-300">
-                        {new Date(tx.date).toLocaleDateString()}
+                        {new Date(tx.date).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
                       </td>
-                      <td className="px-6 py-4 text-slate-200 font-medium">
+                      <td className="px-6 py-4 text-slate-100 font-semibold">
                         {tx.merchant}
                       </td>
-                      <td className="px-6 py-4 text-right font-semibold text-slate-300">
+                      <td className="px-6 py-4 text-right font-bold text-slate-100">
                         ${Math.abs(tx.amount).toFixed(2)}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="px-3 py-1 bg-emerald-600/30 text-emerald-200 text-xs rounded-full">
+                        <span className="px-4 py-2 bg-emerald-600/30 text-emerald-200 text-xs font-semibold rounded-full">
                           {tx.category}
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <span
-                          className={`px-3 py-1 text-xs rounded-full ${
+                          className={`px-4 py-2 text-xs font-semibold rounded-full ${
                             tx.classification === 'must_have'
                               ? 'bg-cyan-600/30 text-cyan-200'
                               : 'bg-violet-600/30 text-violet-200'
                           }`}
                         >
                           {tx.classification === 'must_have'
-                            ? 'Must-Have'
-                            : 'Luxury'}
+                            ? '🏠 Must-Have'
+                            : '✨ Luxury'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-slate-400 text-sm">
+                      <td className="px-6 py-4 text-slate-400 text-sm font-medium">
                         {tx.sourceType}
                       </td>
                     </tr>
@@ -265,35 +271,66 @@ export default function Transactions() {
         {/* Summary Stats */}
         {filteredTransactions.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-slate-700/50 backdrop-blur border border-slate-600 rounded-lg p-6">
-              <p className="text-slate-400 text-sm">Total Transactions</p>
-              <p className="text-3xl font-bold text-white mt-2">
-                {filteredTransactions.length}
-              </p>
-            </div>
-            <div className="bg-slate-700/50 backdrop-blur border border-slate-600 rounded-lg p-6">
-              <p className="text-slate-400 text-sm">Total Amount</p>
-              <p className="text-3xl font-bold text-rose-400 mt-2">
-                $
-                {Math.abs(
+            <StatCard
+              icon="📊"
+              label="Total Transactions"
+              value={filteredTransactions.length.toString()}
+              color="emerald"
+            />
+            <StatCard
+              icon="💸"
+              label="Total Amount"
+              value={`$${Math.abs(
+                filteredTransactions.reduce((sum, t) => sum + t.amount, 0)
+              ).toFixed(2)}`}
+              color="rose"
+            />
+            <StatCard
+              icon="📈"
+              label="Average Transaction"
+              value={`$${(
+                Math.abs(
                   filteredTransactions.reduce((sum, t) => sum + t.amount, 0)
-                ).toFixed(2)}
-              </p>
-            </div>
-            <div className="bg-slate-700/50 backdrop-blur border border-slate-600 rounded-lg p-6">
-              <p className="text-slate-400 text-sm">Average Transaction</p>
-              <p className="text-3xl font-bold text-cyan-400 mt-2">
-                $
-                {(
-                  Math.abs(
-                    filteredTransactions.reduce((sum, t) => sum + t.amount, 0)
-                  ) / filteredTransactions.length
-                ).toFixed(2)}
-              </p>
-            </div>
+                ) / filteredTransactions.length
+              ).toFixed(2)}`}
+              color="cyan"
+            />
           </div>
         )}
       </div>
     </>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  color: 'emerald' | 'rose' | 'cyan';
+}) {
+  const colorGradients = {
+    emerald: 'from-emerald-600/10 to-emerald-600/5 border-emerald-500/30',
+    rose: 'from-rose-600/10 to-rose-600/5 border-rose-500/30',
+    cyan: 'from-cyan-600/10 to-cyan-600/5 border-cyan-500/30',
+  };
+
+  const colorValues = {
+    emerald: 'text-emerald-400',
+    rose: 'text-rose-400',
+    cyan: 'text-cyan-400',
+  };
+
+  return (
+    <div className={`bg-gradient-to-br ${colorGradients[color]} backdrop-blur border rounded-2xl p-6 hover:shadow-lg transition-all`}>
+      <p className="text-slate-400 text-sm font-semibold uppercase tracking-wide">{label}</p>
+      <p className={`text-4xl font-black mt-3 ${colorValues[color]}`}>
+        {icon} {value}
+      </p>
+    </div>
   );
 }

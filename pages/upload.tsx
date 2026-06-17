@@ -11,11 +11,35 @@ export default function Upload() {
   const [success, setSuccess] = useState('');
   const [preview, setPreview] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragActive, setDragActive] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
+      setError('');
+      setSuccess('');
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile) {
+      setFile(droppedFile);
       setError('');
       setSuccess('');
     }
@@ -47,9 +71,7 @@ export default function Upload() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(
-          data.message || 'Error uploading file'
-        );
+        setError(data.message || 'Error uploading file');
         setLoading(false);
         return;
       }
@@ -67,17 +89,23 @@ export default function Upload() {
       }
       setLoading(false);
 
-      // Navigate to dashboard after 2 seconds
       setTimeout(() => router.push('/'), 2000);
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : 'An error occurred'
+        err instanceof Error ? err.message : 'An error occurred'
       );
       setLoading(false);
     }
   };
+
+  const sourceOptions = [
+    { id: 'bank', label: 'Bank', icon: '🏦' },
+    { id: 'bit', label: 'Bit', icon: '💳' },
+    { id: 'paypal', label: 'PayPal', icon: '📱' },
+    { id: 'google_pay', label: 'Google Pay', icon: '🔵' },
+    { id: 'apple_pay', label: 'Apple Pay', icon: '🍎' },
+    { id: 'credit_card', label: 'Credit Card', icon: '💰' },
+  ];
 
   return (
     <>
@@ -85,54 +113,60 @@ export default function Upload() {
         <title>Upload - FinFlow</title>
       </Head>
 
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent mb-2">
-          Upload Transactions
-        </h1>
-        <p className="text-slate-400 mb-8">
-          Upload your bank statements or payment service exports to analyze
-          your spending
-        </p>
+      <div className="max-w-4xl mx-auto space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-5xl font-black mb-3 bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
+            Upload Transactions
+          </h1>
+          <p className="text-slate-400 text-lg">
+            Import your bank statements or payment service exports to analyze your spending
+          </p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* File Type Selection */}
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Source Type Selection */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-4">
-              Data Source
+            <label className="block text-sm font-bold text-slate-200 mb-4 uppercase tracking-wide">
+              📊 Select Data Source
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {[
-                { id: 'bank', label: 'Bank' },
-                { id: 'bit', label: 'Bit' },
-                { id: 'paypal', label: 'PayPal' },
-                { id: 'google_pay', label: 'Google Pay' },
-                { id: 'apple_pay', label: 'Apple Pay' },
-                { id: 'credit_card', label: 'Credit Card' },
-              ].map((source) => (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {sourceOptions.map((source) => (
                 <button
                   key={source.id}
                   type="button"
                   onClick={() => setSourceType(source.id)}
-                  className={`px-4 py-3 rounded-lg font-medium transition ${
+                  className={`px-4 py-4 rounded-xl font-semibold transition-all duration-300 transform ${
                     sourceType === source.id
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                      ? 'bg-gradient-to-r from-emerald-600 to-cyan-600 text-white shadow-lg scale-105'
+                      : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 hover:scale-102'
                   }`}
                 >
-                  {source.label}
+                  <div className="text-2xl mb-1">{source.icon}</div>
+                  <div className="text-sm">{source.label}</div>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* File Upload */}
+          {/* File Upload Drop Zone */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-3">
-              Select File
+            <label className="block text-sm font-bold text-slate-200 mb-4 uppercase tracking-wide">
+              📁 Upload File
             </label>
             <div
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-500 rounded-lg p-8 text-center cursor-pointer hover:border-emerald-400 hover:bg-slate-700/30 transition"
+              className={`border-3 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 transform ${
+                dragActive
+                  ? 'border-emerald-400 bg-emerald-600/20 scale-105'
+                  : file
+                  ? 'border-cyan-400 bg-cyan-600/10'
+                  : 'border-slate-600 bg-slate-800/30 hover:border-violet-400 hover:bg-violet-600/10'
+              }`}
             >
               <input
                 ref={fileInputRef}
@@ -141,73 +175,69 @@ export default function Upload() {
                 onChange={handleFileChange}
                 className="hidden"
               />
-              <div className="space-y-2">
-                <p className="text-4xl">📄</p>
-                <p className="text-slate-300 font-medium">
+              <div className="space-y-3">
+                <p className={`text-5xl transition-transform ${dragActive ? 'scale-125' : ''}`}>
+                  {file ? '✅' : '📤'}
+                </p>
+                <p className="text-slate-200 font-bold text-lg">
                   {file
                     ? `Selected: ${file.name}`
-                    : 'Click to select or drag file here'}
+                    : 'Drag and drop your file here'}
                 </p>
                 <p className="text-slate-400 text-sm">
-                  CSV or Excel files
+                  or click to browse • Supports CSV and Excel files
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Error/Success Messages */}
+          {/* Messages */}
           {error && (
-            <div className="bg-rose-600/20 border border-rose-500/50 text-rose-200 px-4 py-3 rounded-lg">
-              {error}
+            <div className="bg-rose-600/20 border border-rose-500/50 text-rose-200 px-5 py-4 rounded-xl flex items-center gap-3">
+              <span>⚠️</span>
+              <span>{error}</span>
             </div>
           )}
           {success && (
-            <div className="bg-emerald-600/20 border border-emerald-500/50 text-emerald-200 px-4 py-3 rounded-lg">
-              {success}
+            <div className="bg-emerald-600/20 border border-emerald-500/50 text-emerald-200 px-5 py-4 rounded-xl flex items-center gap-3 animate-pulse">
+              <span>✅</span>
+              <span>{success}</span>
             </div>
           )}
 
           {/* Preview */}
           {preview.length > 0 && (
-            <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-6">
-              <h3 className="text-lg font-bold text-white mb-4">
-                Preview (first 5 rows)
+            <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl p-8 shadow-xl">
+              <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                <span>👀</span> Preview (first 5 transactions)
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="border-b border-slate-600">
-                    <tr>
-                      <th className="text-left py-2 text-slate-300">
-                        Date
-                      </th>
-                      <th className="text-left py-2 text-slate-300">
-                        Merchant
-                      </th>
-                      <th className="text-right py-2 text-slate-300">
-                        Amount
-                      </th>
-                      <th className="text-left py-2 text-slate-300">
-                        Category
-                      </th>
+                  <thead className="border-b-2 border-slate-600">
+                    <tr className="text-slate-300">
+                      <th className="text-left py-3 font-semibold">Date</th>
+                      <th className="text-left py-3 font-semibold">Merchant</th>
+                      <th className="text-right py-3 font-semibold">Amount</th>
+                      <th className="text-left py-3 font-semibold">Category</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-700">
                     {preview.map((tx, idx) => (
                       <tr
                         key={idx}
-                        className="border-b border-slate-600 hover:bg-slate-600/30"
+                        className="hover:bg-slate-600/30 transition-colors"
                       >
-                        <td className="py-2 text-slate-300">
+                        <td className="py-3 text-slate-300">
                           {new Date(tx.date).toLocaleDateString()}
                         </td>
-                        <td className="py-2 text-slate-300">
+                        <td className="py-3 text-slate-200 font-medium">
                           {tx.merchant}
                         </td>
-                        <td className="text-right py-2 text-slate-300">
+                        <td className="text-right py-3 text-slate-200 font-semibold">
                           ${Math.abs(tx.amount).toFixed(2)}
                         </td>
-                        <td className="py-2">
-                          <span className="px-3 py-1 bg-emerald-600/30 text-emerald-200 text-xs rounded-full">
+                        <td className="py-3">
+                          <span className="px-3 py-1 bg-emerald-600/30 text-emerald-200 text-xs font-semibold rounded-full">
                             {tx.category || 'Uncategorized'}
                           </span>
                         </td>
@@ -223,41 +253,68 @@ export default function Upload() {
           <button
             type="submit"
             disabled={!file || loading}
-            className="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-8 py-4 bg-gradient-to-r from-emerald-500 via-cyan-500 to-violet-500 hover:from-emerald-600 hover:via-cyan-600 hover:to-violet-600 text-white rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 shadow-lg hover:shadow-2xl"
           >
-            {loading ? 'Processing...' : 'Upload & Process'}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="animate-spin">⏳</span> Processing...
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                📤 Upload & Process
+              </span>
+            )}
           </button>
         </form>
 
-        {/* Info Section */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-slate-700/50 backdrop-blur border border-slate-600 rounded-lg p-6">
-            <h3 className="text-lg font-bold text-white mb-2">
-              💾 Supported Formats
-            </h3>
-            <p className="text-slate-400 text-sm">
-              CSV and Excel files from any bank or payment service
-            </p>
-          </div>
-          <div className="bg-slate-700/50 backdrop-blur border border-slate-600 rounded-lg p-6">
-            <h3 className="text-lg font-bold text-white mb-2">
-              🔒 Your Data
-            </h3>
-            <p className="text-slate-400 text-sm">
-              All transactions are processed securely and stored encrypted
-            </p>
-          </div>
-          <div className="bg-slate-700/50 backdrop-blur border border-slate-600 rounded-lg p-6">
-            <h3 className="text-lg font-bold text-white mb-2">
-              ✨ Auto-Categorized
-            </h3>
-            <p className="text-slate-400 text-sm">
-              Transactions are automatically categorized and can be manually
-              adjusted
-            </p>
-          </div>
+        {/* Info Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <InfoCard
+            icon="💾"
+            title="Supported Formats"
+            description="CSV and Excel files from any bank or payment service"
+            color="emerald"
+          />
+          <InfoCard
+            icon="🔒"
+            title="Secure & Private"
+            description="All transactions are processed securely and encrypted"
+            color="cyan"
+          />
+          <InfoCard
+            icon="✨"
+            title="Auto-Categorized"
+            description="Transactions are automatically categorized and editable"
+            color="violet"
+          />
         </div>
       </div>
     </>
+  );
+}
+
+function InfoCard({
+  icon,
+  title,
+  description,
+  color,
+}: {
+  icon: string;
+  title: string;
+  description: string;
+  color: 'emerald' | 'cyan' | 'violet';
+}) {
+  const colorGradients = {
+    emerald: 'from-emerald-600/10 to-emerald-600/5 border-emerald-500/30',
+    cyan: 'from-cyan-600/10 to-cyan-600/5 border-cyan-500/30',
+    violet: 'from-violet-600/10 to-violet-600/5 border-violet-500/30',
+  };
+
+  return (
+    <div className={`bg-gradient-to-br ${colorGradients[color]} backdrop-blur border rounded-2xl p-6 hover:shadow-lg transition-all group`}>
+      <div className="text-4xl mb-4 group-hover:scale-125 transition-transform">{icon}</div>
+      <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
+      <p className="text-slate-400 text-sm">{description}</p>
+    </div>
   );
 }
