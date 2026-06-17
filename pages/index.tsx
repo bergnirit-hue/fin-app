@@ -7,6 +7,8 @@ interface DashboardMetrics {
   totalExpenses: number;
   savings: number;
   savingsPercentage: number;
+  mustHave: number;
+  luxury: number;
   byCategory: { [key: string]: number };
 }
 
@@ -31,23 +33,39 @@ export default function Dashboard() {
       return;
     }
 
-    setMetrics({
-      totalIncome: 5000,
-      totalExpenses: 3500,
-      savings: 1500,
-      savingsPercentage: 30,
-      byCategory: {
-        Groceries: 800,
-        Dining: 600,
-        Transportation: 400,
-        Entertainment: 350,
-        Shopping: 500,
-        Utilities: 300,
-        Other: 150,
-      },
-    });
+    (async () => {
+      try {
+        const res = await fetch('/api/dashboard', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-    setLoading(false);
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          router.push('/login');
+          return;
+        }
+
+        const data = await res.json();
+
+        if (!data.hasData) {
+          setMetrics(null);
+        } else {
+          setMetrics({
+            totalIncome: data.totalIncome,
+            totalExpenses: data.totalExpenses,
+            savings: data.savings,
+            savingsPercentage: data.savingsPercentage,
+            mustHave: data.mustHave,
+            luxury: data.luxury,
+            byCategory: data.byCategory,
+          });
+        }
+      } catch (err) {
+        setMetrics(null);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [router]);
 
   if (loading) {
@@ -199,13 +217,13 @@ export default function Dashboard() {
               />
               <SummaryRow
                 label="Must-Have"
-                value={`$${(metrics.totalExpenses * 0.6).toFixed(2)}`}
+                value={`$${metrics.mustHave.toFixed(2)}`}
                 color="cyan"
                 icon="🏠"
               />
               <SummaryRow
                 label="Luxury"
-                value={`$${(metrics.totalExpenses * 0.4).toFixed(2)}`}
+                value={`$${metrics.luxury.toFixed(2)}`}
                 color="violet"
                 icon="✨"
               />
