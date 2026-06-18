@@ -24,7 +24,7 @@ const colors = {
 
 export default function Dashboard() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, formatMoney } = useI18n();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -107,7 +107,7 @@ export default function Dashboard() {
   return (
     <>
       <Head>
-        <title>{t('dashboard.title')} - FinFlow</title>
+        <title>{t('dashboard.title')} - ElastiCash</title>
       </Head>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
@@ -123,23 +123,23 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
             title={t('dashboard.totalIncome')}
-            value={`$${metrics.totalIncome.toFixed(2)}`}
-            change={`+${metrics.totalIncome.toFixed(2)}`}
+            value={formatMoney(metrics.totalIncome)}
+            change={`+${formatMoney(metrics.totalIncome)}`}
             icon="💰"
             color="emerald"
             accentColor="from-emerald-600/20 to-emerald-600/5 border-emerald-500/30"
           />
           <MetricCard
             title={t('dashboard.totalExpenses')}
-            value={`$${metrics.totalExpenses.toFixed(2)}`}
-            change={`-${metrics.totalExpenses.toFixed(2)}`}
+            value={formatMoney(metrics.totalExpenses)}
+            change={`-${formatMoney(metrics.totalExpenses)}`}
             icon="💸"
             color="rose"
             accentColor="from-rose-600/20 to-rose-600/5 border-rose-500/30"
           />
           <MetricCard
             title={t('dashboard.totalSavings')}
-            value={`$${metrics.savings.toFixed(2)}`}
+            value={formatMoney(metrics.savings)}
             change={t('dashboard.pctOfIncome', {
               pct: metrics.savingsPercentage.toFixed(1),
             })}
@@ -186,7 +186,7 @@ export default function Dashboard() {
                         {t(`categories.${cat.category}`)}
                       </span>
                       <span className="text-slate-100 font-bold text-lg">
-                        ${cat.amount.toFixed(2)}
+                        {formatMoney(cat.amount)}
                       </span>
                     </div>
                     <div className="w-full bg-slate-700/50 rounded-full h-3 overflow-hidden">
@@ -215,19 +215,19 @@ export default function Dashboard() {
             <div className="space-y-4">
               <SummaryRow
                 label={t('dashboard.income')}
-                value={`$${metrics.totalIncome.toFixed(2)}`}
+                value={formatMoney(metrics.totalIncome)}
                 color="emerald"
                 icon="📥"
               />
               <SummaryRow
                 label={t('dashboard.mustHave')}
-                value={`$${metrics.mustHave.toFixed(2)}`}
+                value={formatMoney(metrics.mustHave)}
                 color="cyan"
                 icon="🏠"
               />
               <SummaryRow
                 label={t('dashboard.luxury')}
-                value={`$${metrics.luxury.toFixed(2)}`}
+                value={formatMoney(metrics.luxury)}
                 color="violet"
                 icon="✨"
               />
@@ -235,7 +235,7 @@ export default function Dashboard() {
               <div className="border-t border-slate-600/50 pt-4 mt-6">
                 <SummaryRow
                   label={t('dashboard.netSavings')}
-                  value={`$${metrics.savings.toFixed(2)}`}
+                  value={formatMoney(metrics.savings)}
                   color="emerald"
                   icon="🎉"
                   isBold

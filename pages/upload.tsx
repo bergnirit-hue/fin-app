@@ -5,7 +5,7 @@ import { useI18n } from '@/lib/i18n';
 
 export default function Upload() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, formatMoney, formatDate } = useI18n();
   const [file, setFile] = useState<File | null>(null);
   const [sourceType, setSourceType] = useState('bank');
   const [loading, setLoading] = useState(false);
@@ -112,7 +112,7 @@ export default function Upload() {
   return (
     <>
       <Head>
-        <title>{t('upload.title')} - FinFlow</title>
+        <title>{t('upload.title')} - ElastiCash</title>
       </Head>
 
       <div className="max-w-4xl mx-auto space-y-8">
@@ -228,13 +228,13 @@ export default function Upload() {
                         className="hover:bg-slate-600/30 transition-colors"
                       >
                         <td className="py-3 text-slate-300">
-                          {new Date(tx.date).toLocaleDateString()}
+                          {formatDate(tx.date)}
                         </td>
                         <td className="py-3 text-slate-200 font-medium">
                           {tx.merchant}
                         </td>
                         <td className="text-end py-3 text-slate-200 font-semibold">
-                          ${Math.abs(tx.amount).toFixed(2)}
+                          {formatMoney(Math.abs(tx.amount))}
                         </td>
                         <td className="py-3">
                           <span className="px-3 py-1 bg-emerald-600/30 text-emerald-200 text-xs font-semibold rounded-full">

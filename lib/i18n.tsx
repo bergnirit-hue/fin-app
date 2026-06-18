@@ -12,7 +12,7 @@ export type Lang = 'he' | 'en';
 type Dict = Record<string, any>;
 
 const en: Dict = {
-  common: { appName: 'FinFlow', loading: 'Loading...' },
+  common: { appName: 'ElastiCash', loading: 'Loading...' },
   nav: {
     dashboard: 'Dashboard',
     upload: 'Upload',
@@ -187,7 +187,7 @@ const en: Dict = {
 };
 
 const he: Dict = {
-  common: { appName: 'FinFlow', loading: 'טוען...' },
+  common: { appName: 'ElastiCash', loading: 'טוען...' },
   nav: {
     dashboard: 'לוח בקרה',
     upload: 'העלאה',
@@ -376,6 +376,10 @@ interface I18nValue {
   setLang: (lang: Lang) => void;
   toggle: () => void;
   t: TFunction;
+  // Default display currency is the Israeli Shekel (ILS / ₪). Amounts are
+  // stored as raw numbers; multi-currency conversion is a Phase 2 item.
+  formatMoney: (amount: number) => string;
+  formatDate: (date: string | Date) => string;
 }
 
 const I18nContext = createContext<I18nValue | null>(null);
@@ -430,8 +434,35 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     [lang]
   );
 
+  const locale = lang === 'he' ? 'he-IL' : 'en-US';
+
+  const formatMoney = useCallback(
+    (amount: number) =>
+      new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: 'ILS',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount),
+    [locale]
+  );
+
+  const formatDate = useCallback(
+    (date: string | Date) => {
+      const d = typeof date === 'string' ? new Date(date) : date;
+      return d.toLocaleDateString(locale, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    },
+    [locale]
+  );
+
   return (
-    <I18nContext.Provider value={{ lang, dir, setLang, toggle, t }}>
+    <I18nContext.Provider
+      value={{ lang, dir, setLang, toggle, t, formatMoney, formatDate }}
+    >
       {children}
     </I18nContext.Provider>
   );

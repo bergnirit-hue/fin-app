@@ -51,7 +51,7 @@ export default function Signup() {
   return (
     <>
       <Head>
-        <title>{t('signup.title')} - FinFlow</title>
+        <title>{t('signup.title')} - ElastiCash</title>
       </Head>
 
       <div className="min-h-screen flex items-center justify-center">
@@ -60,7 +60,7 @@ export default function Signup() {
             {/* Logo */}
             <div className="text-center mb-8">
               <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                FinFlow
+                ElastiCash
               </h1>
               <p className="text-slate-400 mt-2">{t('signup.subtitle')}</p>
             </div>

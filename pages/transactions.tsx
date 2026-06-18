@@ -15,7 +15,7 @@ interface Transaction {
 
 export default function Transactions() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, formatMoney, formatDate } = useI18n();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -129,6 +129,13 @@ export default function Transactions() {
       )
     : transactions;
 
+  // Translate a source type (e.g. "bank" -> "בנק"), falling back to the raw
+  // value for compound sources like "bank+bit".
+  const sourceLabel = (source: string) => {
+    const label = t(`sources.${source}`);
+    return label === `sources.${source}` ? source : label;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -140,7 +147,7 @@ export default function Transactions() {
   return (
     <>
       <Head>
-        <title>{t('transactions.title')} - FinFlow</title>
+        <title>{t('transactions.title')} - ElastiCash</title>
       </Head>
 
       <div className="space-y-8">
@@ -255,17 +262,13 @@ export default function Transactions() {
                       className="hover:bg-slate-600/30 transition-colors"
                     >
                       <td className="px-6 py-4 text-slate-300">
-                        {new Date(tx.date).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
+                        {formatDate(tx.date)}
                       </td>
                       <td className="px-6 py-4 text-slate-100 font-semibold">
                         {tx.merchant}
                       </td>
                       <td className="px-6 py-4 text-end font-bold text-slate-100">
-                        ${Math.abs(tx.amount).toFixed(2)}
+                        {formatMoney(Math.abs(tx.amount))}
                       </td>
                       <td className="px-6 py-4">
                         {editingId === tx.id ? (
@@ -309,7 +312,7 @@ export default function Transactions() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-slate-400 text-sm font-medium">
-                        {tx.sourceType}
+                        {sourceLabel(tx.sourceType)}
                       </td>
                     </tr>
                   ))}
@@ -331,19 +334,21 @@ export default function Transactions() {
             <StatCard
               icon="💸"
               label={t('transactions.totalAmount')}
-              value={`$${Math.abs(
-                filteredTransactions.reduce((sum, t) => sum + t.amount, 0)
-              ).toFixed(2)}`}
+              value={formatMoney(
+                Math.abs(
+                  filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0)
+                )
+              )}
               color="rose"
             />
             <StatCard
               icon="📈"
               label={t('transactions.avgTransaction')}
-              value={`$${(
+              value={formatMoney(
                 Math.abs(
-                  filteredTransactions.reduce((sum, t) => sum + t.amount, 0)
+                  filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0)
                 ) / filteredTransactions.length
-              ).toFixed(2)}`}
+              )}
               color="cyan"
             />
           </div>

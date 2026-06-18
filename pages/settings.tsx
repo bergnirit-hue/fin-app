@@ -38,7 +38,7 @@ export default function Settings() {
   return (
     <>
       <Head>
-        <title>{t('settings.title')} - FinFlow</title>
+        <title>{t('settings.title')} - ElastiCash</title>
       </Head>
 
       <div className="space-y-8">
@@ -104,10 +104,10 @@ export default function Settings() {
                     label={t('settings.currency')}
                     icon="💱"
                     options={[
+                      { value: 'ils', label: 'ILS (₪)' },
                       { value: 'usd', label: 'USD ($)' },
                       { value: 'eur', label: 'EUR (€)' },
                       { value: 'gbp', label: 'GBP (£)' },
-                      { value: 'ils', label: 'ILS (₪)' },
                     ]}
                   />
 
@@ -115,8 +115,8 @@ export default function Settings() {
                     label={t('settings.dateFormat')}
                     icon="📅"
                     options={[
-                      { value: 'mmddyyyy', label: 'MM/DD/YYYY' },
                       { value: 'ddmmyyyy', label: 'DD/MM/YYYY' },
+                      { value: 'mmddyyyy', label: 'MM/DD/YYYY' },
                       { value: 'yyyymmdd', label: 'YYYY-MM-DD' },
                     ]}
                   />

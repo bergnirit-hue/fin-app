@@ -49,6 +49,28 @@ export const DEFAULT_RULES: CategorizationRule[] = [
 
   // Pet Care
   { pattern: /pet|vet|veterinary|dog|cat|animal|petsmart|petco/i, category: 'Pets' },
+
+  // --- Hebrew / Israeli merchants ---
+  // Health / pharmacy / HMO (kept before groceries so Super-Pharm maps here)
+  { pattern: /סופר.?פארם|ניו.?פארם|מכבי|כללית|מאוחדת|לאומית|בית מרקחת|קופת חולים|טרם/i, category: 'Health' },
+  // Groceries
+  { pattern: /שופרסל|רמי לוי|ויקטורי|יוחננוף|טיב טעם|מגה בעיר|יינות ביתן|אושר עד|מחסני השוק|מכולת|סופרמרקט|am.?pm/i, category: 'Groceries' },
+  // Dining
+  { pattern: /ארומה|קפה קפה|בית קפה|לנדוור|רולדין|מקדונלד|בורגר|פיצה|פלאפל|שווארמה|מסעד|וולט|wolt|מאפה/i, category: 'Dining' },
+  // Transportation / fuel
+  { pattern: /רכבת ישראל|אגד|מטרופולין|רב.?קו|פנגו|סלופארק|דלק|דור אלון|סונול|פז |מונית|חניון/i, category: 'Transportation' },
+  // Housing / mortgage / property tax
+  { pattern: /משכנתא|שכירות|שכ.?ד|ארנונה|ועד בית|דמי ניהול/i, category: 'Housing' },
+  // Utilities / telecom
+  { pattern: /חברת החשמל|תאגיד המים|מי אביבים|בזק|פרטנר|סלקום|הוט|yes|גולן טלקום|פלאפון/i, category: 'Utilities' },
+  // Insurance
+  { pattern: /ביטוח|הראל|כלל ביטוח|מגדל ביטוח|הפניקס|מנורה|איילון/i, category: 'Insurance' },
+  // Shopping
+  { pattern: /זארה|קסטרו|פוקס|רנואר|איקאה|הום סנטר|מקס סטוק|גולף|טרמינל איקס/i, category: 'Shopping' },
+  // Education
+  { pattern: /בית ספר|גן ילדים|אוניברסיט|מכללה|צהרון|שכר לימוד/i, category: 'Education' },
+  // Entertainment
+  { pattern: /סינמה|יס פלאנט|רב.?חן|הבימה|תיאטרון|הופעה|לונה פארק/i, category: 'Entertainment' },
 ];
 
 export class CategorizationEngine {

@@ -67,7 +67,7 @@ function AppShell({ Component, pageProps }: AppProps) {
                   href="/"
                   className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent"
                 >
-                  FinFlow
+                  ElastiCash
                 </Link>
               </div>
 
