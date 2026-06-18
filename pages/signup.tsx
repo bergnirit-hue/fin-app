@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Head from 'next/head';
+import { useI18n } from '@/lib/i18n';
 
 export default function Signup() {
   const router = useRouter();
+  const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -18,7 +20,7 @@ export default function Signup() {
     setError('');
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('signup.mismatch'));
       setLoading(false);
       return;
     }
@@ -32,7 +34,7 @@ export default function Signup() {
 
       if (!response.ok) {
         const data = await response.json();
-        setError(data.message || 'Signup failed');
+        setError(data.message || t('signup.failed'));
         setLoading(false);
         return;
       }
@@ -41,7 +43,7 @@ export default function Signup() {
       localStorage.setItem('token', data.token);
       router.push('/');
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      setError(t('signup.error'));
       setLoading(false);
     }
   };
@@ -49,7 +51,7 @@ export default function Signup() {
   return (
     <>
       <Head>
-        <title>Sign Up - FinFlow</title>
+        <title>{t('signup.title')} - FinFlow</title>
       </Head>
 
       <div className="min-h-screen flex items-center justify-center">
@@ -60,30 +62,28 @@ export default function Signup() {
               <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                 FinFlow
               </h1>
-              <p className="text-slate-400 mt-2">
-                Start tracking your finances
-              </p>
+              <p className="text-slate-400 mt-2">{t('signup.subtitle')}</p>
             </div>
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Full Name
+                  {t('signup.fullName')}
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
-                  placeholder="John Doe"
+                  placeholder={t('signup.fullNamePlaceholder')}
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Email
+                  {t('signup.email')}
                 </label>
                 <input
                   type="email"
@@ -97,7 +97,7 @@ export default function Signup() {
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Password
+                  {t('signup.password')}
                 </label>
                 <input
                   type="password"
@@ -111,7 +111,7 @@ export default function Signup() {
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Confirm Password
+                  {t('signup.confirmPassword')}
                 </label>
                 <input
                   type="password"
@@ -134,26 +134,24 @@ export default function Signup() {
                 disabled={loading}
                 className="w-full px-4 py-2 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-lg font-medium transition disabled:opacity-50"
               >
-                {loading ? 'Creating Account...' : 'Create Account'}
+                {loading ? t('signup.creatingAccount') : t('signup.createAccount')}
               </button>
             </form>
 
             {/* Login Link */}
             <p className="text-center text-slate-400 mt-6">
-              Already have an account?{' '}
+              {t('signup.haveAccount')}{' '}
               <Link
                 href="/login"
                 className="text-emerald-400 hover:text-emerald-300 font-medium transition"
               >
-                Sign in
+                {t('signup.signIn')}
               </Link>
             </p>
 
             {/* Demo Note */}
             <div className="mt-8 p-4 bg-slate-600/50 rounded-lg border border-slate-500/50">
-              <p className="text-xs text-slate-400 text-center">
-                Demo mode: All signups are created immediately
-              </p>
+              <p className="text-xs text-slate-400 text-center">{t('signup.demo')}</p>
             </div>
           </div>
         </div>

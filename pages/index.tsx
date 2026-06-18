@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import { useI18n } from '@/lib/i18n';
 
 interface DashboardMetrics {
   totalIncome: number;
@@ -23,6 +24,7 @@ const colors = {
 
 export default function Dashboard() {
   const router = useRouter();
+  const { t } = useI18n();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -71,7 +73,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-2xl text-slate-300">Loading...</div>
+        <div className="text-2xl text-slate-300">{t('common.loading')}</div>
       </div>
     );
   }
@@ -80,16 +82,14 @@ export default function Dashboard() {
     return (
       <div className="text-center py-12">
         <h2 className="text-2xl font-bold text-slate-200 mb-4">
-          No data yet
+          {t('dashboard.noData')}
         </h2>
-        <p className="text-slate-400 mb-6">
-          Start by uploading your first file
-        </p>
+        <p className="text-slate-400 mb-6">{t('dashboard.noDataSub')}</p>
         <button
           onClick={() => router.push('/upload')}
           className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white rounded-lg font-medium transition transform hover:scale-105"
         >
-          Upload File
+          {t('dashboard.uploadFile')}
         </button>
       </div>
     );
@@ -107,24 +107,22 @@ export default function Dashboard() {
   return (
     <>
       <Head>
-        <title>Dashboard - FinFlow</title>
+        <title>{t('dashboard.title')} - FinFlow</title>
       </Head>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
         {/* Header with gradient */}
         <div className="mb-8">
           <h1 className="text-5xl font-black mb-2 bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
-            Dashboard
+            {t('dashboard.title')}
           </h1>
-          <p className="text-slate-400 text-lg">
-            Track your finances and spending patterns at a glance
-          </p>
+          <p className="text-slate-400 text-lg">{t('dashboard.subtitle')}</p>
         </div>
 
         {/* Key Metrics Grid - 4 Cards with Different Colors */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
-            title="Total Income"
+            title={t('dashboard.totalIncome')}
             value={`$${metrics.totalIncome.toFixed(2)}`}
             change={`+${metrics.totalIncome.toFixed(2)}`}
             icon="💰"
@@ -132,7 +130,7 @@ export default function Dashboard() {
             accentColor="from-emerald-600/20 to-emerald-600/5 border-emerald-500/30"
           />
           <MetricCard
-            title="Total Expenses"
+            title={t('dashboard.totalExpenses')}
             value={`$${metrics.totalExpenses.toFixed(2)}`}
             change={`-${metrics.totalExpenses.toFixed(2)}`}
             icon="💸"
@@ -140,17 +138,19 @@ export default function Dashboard() {
             accentColor="from-rose-600/20 to-rose-600/5 border-rose-500/30"
           />
           <MetricCard
-            title="Total Savings"
+            title={t('dashboard.totalSavings')}
             value={`$${metrics.savings.toFixed(2)}`}
-            change={`${metrics.savingsPercentage.toFixed(1)}% of income`}
+            change={t('dashboard.pctOfIncome', {
+              pct: metrics.savingsPercentage.toFixed(1),
+            })}
             icon="🎯"
             color="cyan"
             accentColor="from-cyan-600/20 to-cyan-600/5 border-cyan-500/30"
           />
           <MetricCard
-            title="Savings Rate"
+            title={t('dashboard.savingsRate')}
             value={`${metrics.savingsPercentage.toFixed(1)}%`}
-            change="This month"
+            change={t('dashboard.thisMonth')}
             icon="📈"
             color="violet"
             accentColor="from-violet-600/20 to-violet-600/5 border-violet-500/30"
@@ -163,9 +163,9 @@ export default function Dashboard() {
           <div className="lg:col-span-2 bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur-lg border border-slate-600/50 rounded-2xl p-8 shadow-2xl hover:shadow-3xl transition-all">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-white">
-                📊 Top Spending Categories
+                📊 {t('dashboard.topCategories')}
               </h2>
-              <div className="text-sm text-slate-400">Last 30 days</div>
+              <div className="text-sm text-slate-400">{t('dashboard.last30')}</div>
             </div>
 
             <div className="space-y-5">
@@ -183,7 +183,7 @@ export default function Dashboard() {
                   <div key={cat.category} className="group">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-slate-200 font-semibold text-sm">
-                        {cat.category}
+                        {t(`categories.${cat.category}`)}
                       </span>
                       <span className="text-slate-100 font-bold text-lg">
                         ${cat.amount.toFixed(2)}
@@ -195,8 +195,10 @@ export default function Dashboard() {
                         style={{ width: `${cat.percentage}%` }}
                       />
                     </div>
-                    <div className="text-right text-xs text-slate-400 mt-1">
-                      {cat.percentage.toFixed(1)}% of expenses
+                    <div className="text-end text-xs text-slate-400 mt-1">
+                      {t('dashboard.pctOfExpenses', {
+                        pct: cat.percentage.toFixed(1),
+                      })}
                     </div>
                   </div>
                 );
@@ -206,23 +208,25 @@ export default function Dashboard() {
 
           {/* Right: Summary Card - 1 column width */}
           <div className="bg-gradient-to-br from-emerald-600/10 via-cyan-600/10 to-violet-600/10 backdrop-blur-lg border border-emerald-500/20 rounded-2xl p-8 shadow-2xl">
-            <h2 className="text-2xl font-bold text-white mb-6">💡 Summary</h2>
+            <h2 className="text-2xl font-bold text-white mb-6">
+              💡 {t('dashboard.summary')}
+            </h2>
 
             <div className="space-y-4">
               <SummaryRow
-                label="Income"
+                label={t('dashboard.income')}
                 value={`$${metrics.totalIncome.toFixed(2)}`}
                 color="emerald"
                 icon="📥"
               />
               <SummaryRow
-                label="Must-Have"
+                label={t('dashboard.mustHave')}
                 value={`$${metrics.mustHave.toFixed(2)}`}
                 color="cyan"
                 icon="🏠"
               />
               <SummaryRow
-                label="Luxury"
+                label={t('dashboard.luxury')}
                 value={`$${metrics.luxury.toFixed(2)}`}
                 color="violet"
                 icon="✨"
@@ -230,7 +234,7 @@ export default function Dashboard() {
 
               <div className="border-t border-slate-600/50 pt-4 mt-6">
                 <SummaryRow
-                  label="Net Savings"
+                  label={t('dashboard.netSavings')}
                   value={`$${metrics.savings.toFixed(2)}`}
                   color="emerald"
                   icon="🎉"
@@ -244,16 +248,14 @@ export default function Dashboard() {
         {/* Call-to-Action Section */}
         <div className="bg-gradient-to-r from-emerald-600/20 via-cyan-600/20 to-violet-600/20 backdrop-blur-lg border border-emerald-400/30 rounded-2xl p-8 text-center shadow-2xl">
           <h3 className="text-3xl font-bold text-white mb-3">
-            ✨ Ready to Add More Data?
+            ✨ {t('dashboard.ctaTitle')}
           </h3>
-          <p className="text-slate-300 mb-8 text-lg">
-            Upload transactions from multiple sources to get a complete picture of your finances
-          </p>
+          <p className="text-slate-300 mb-8 text-lg">{t('dashboard.ctaSub')}</p>
           <button
             onClick={() => router.push('/upload')}
             className="px-8 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white rounded-lg font-bold text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl active:scale-95"
           >
-            📤 Upload New File
+            📤 {t('dashboard.uploadNew')}
           </button>
         </div>
       </div>

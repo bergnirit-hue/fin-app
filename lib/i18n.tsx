@@ -1,0 +1,446 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react';
+
+export type Lang = 'he' | 'en';
+
+type Dict = Record<string, any>;
+
+const en: Dict = {
+  common: { appName: 'FinFlow', loading: 'Loading...' },
+  nav: {
+    dashboard: 'Dashboard',
+    upload: 'Upload',
+    transactions: 'Transactions',
+    settings: 'Settings',
+    logout: 'Logout',
+    switchTo: 'עברית',
+  },
+  login: {
+    title: 'Login',
+    subtitle: 'Track your finances with ease',
+    email: 'Email',
+    password: 'Password',
+    signIn: 'Sign In',
+    signingIn: 'Signing in...',
+    noAccount: "Don't have an account?",
+    signUp: 'Sign up',
+    demo: 'Demo mode: Any email/password will work',
+    failed: 'Login failed',
+    error: 'An error occurred. Please try again.',
+  },
+  signup: {
+    title: 'Sign Up',
+    subtitle: 'Start tracking your finances',
+    fullName: 'Full Name',
+    fullNamePlaceholder: 'John Doe',
+    email: 'Email',
+    password: 'Password',
+    confirmPassword: 'Confirm Password',
+    createAccount: 'Create Account',
+    creatingAccount: 'Creating Account...',
+    haveAccount: 'Already have an account?',
+    signIn: 'Sign in',
+    demo: 'Demo mode: All signups are created immediately',
+    mismatch: 'Passwords do not match',
+    failed: 'Signup failed',
+    error: 'An error occurred. Please try again.',
+  },
+  dashboard: {
+    title: 'Dashboard',
+    subtitle: 'Track your finances and spending patterns at a glance',
+    totalIncome: 'Total Income',
+    totalExpenses: 'Total Expenses',
+    totalSavings: 'Total Savings',
+    savingsRate: 'Savings Rate',
+    pctOfIncome: '{pct}% of income',
+    thisMonth: 'This month',
+    topCategories: 'Top Spending Categories',
+    last30: 'Last 30 days',
+    pctOfExpenses: '{pct}% of expenses',
+    summary: 'Summary',
+    income: 'Income',
+    mustHave: 'Must-Have',
+    luxury: 'Luxury',
+    netSavings: 'Net Savings',
+    noData: 'No data yet',
+    noDataSub: 'Start by uploading your first file',
+    uploadFile: 'Upload File',
+    ctaTitle: 'Ready to Add More Data?',
+    ctaSub:
+      'Upload transactions from multiple sources to get a complete picture of your finances',
+    uploadNew: 'Upload New File',
+  },
+  upload: {
+    title: 'Upload Transactions',
+    subtitle:
+      'Import your bank statements or payment service exports to analyze your spending',
+    selectSource: 'Select Data Source',
+    fileLabel: 'Upload File',
+    dragDrop: 'Drag and drop your file here',
+    orClick: 'or click to browse • Supports CSV and Excel files',
+    selected: 'Selected: {name}',
+    processing: 'Processing...',
+    uploadProcess: 'Upload & Process',
+    previewTitle: 'Preview (first 5 transactions)',
+    thDate: 'Date',
+    thMerchant: 'Merchant',
+    thAmount: 'Amount',
+    thCategory: 'Category',
+    uncategorized: 'Uncategorized',
+    errorSelect: 'Please select a file',
+    errorUpload: 'Error uploading file',
+    error: 'An error occurred',
+    success: '✓ File processed successfully! {count} transactions saved',
+    info1Title: 'Supported Formats',
+    info1Desc: 'CSV and Excel files from any bank or payment service',
+    info2Title: 'Secure & Private',
+    info2Desc: 'All transactions are processed securely and encrypted',
+    info3Title: 'Auto-Categorized',
+    info3Desc: 'Transactions are automatically categorized and editable',
+  },
+  sources: {
+    bank: 'Bank',
+    bit: 'Bit',
+    paypal: 'PayPal',
+    google_pay: 'Google Pay',
+    apple_pay: 'Apple Pay',
+    credit_card: 'Credit Card',
+  },
+  transactions: {
+    title: 'Transactions',
+    subtitle: 'Review, filter, and manage your transactions',
+    search: 'Search by merchant...',
+    allCategories: 'All Categories',
+    allTypes: 'All Types',
+    mustHave: 'Must-Have',
+    luxury: 'Luxury',
+    thDate: 'Date',
+    thMerchant: 'Merchant',
+    thAmount: 'Amount',
+    thCategory: 'Category',
+    thType: 'Type',
+    thSource: 'Source',
+    none: 'No transactions found',
+    totalTransactions: 'Total Transactions',
+    totalAmount: 'Total Amount',
+    avgTransaction: 'Average Transaction',
+    reCategorize: 'Click to re-categorize',
+  },
+  settings: {
+    title: 'Settings',
+    subtitle: 'Manage your account, preferences, and integrations',
+    tabGeneral: 'General',
+    tabHousehold: 'Household',
+    tabCategories: 'Categories',
+    tabNotifications: 'Notifications',
+    generalTitle: 'General Settings',
+    generalSub: 'Customize your app experience',
+    emailAddress: 'Email Address',
+    currency: 'Preferred Currency',
+    dateFormat: 'Date Format',
+    saveChanges: 'Save Changes',
+    inviteTitle: 'Invite Your Spouse',
+    inviteSub:
+      'Create a shared household account to view combined finances and sync spending data',
+    spouseEmail: 'Spouse Email Address',
+    sendInvite: 'Send Invite',
+    membersTitle: 'Household Members',
+    membersEmpty: 'Only you for now. Invite your spouse to get started!',
+    categoryRules: 'Category Rules',
+    categoryRulesSub: 'Customize how transactions are automatically categorized',
+    addRule: 'Add New Rule',
+    notifTitle: 'Notification Preferences',
+    notifSub: "Choose what notifications you'd like to receive",
+    notifBudget: 'Budget Alerts',
+    notifBudgetDesc: 'Notify when spending exceeds budget',
+    notifWeekly: 'Weekly Summary',
+    notifWeeklyDesc: 'Get a weekly summary of your spending',
+    notifNew: 'New Transactions',
+    notifNewDesc: 'Notify when new transactions are imported',
+    savePrefs: 'Save Preferences',
+  },
+  categories: {
+    Groceries: 'Groceries',
+    Dining: 'Dining',
+    Shopping: 'Shopping',
+    Transportation: 'Transportation',
+    Travel: 'Travel',
+    Entertainment: 'Entertainment',
+    Subscriptions: 'Subscriptions',
+    Health: 'Health',
+    Utilities: 'Utilities',
+    Housing: 'Housing',
+    Insurance: 'Insurance',
+    Education: 'Education',
+    'Personal Care': 'Personal Care',
+    Pets: 'Pets',
+    Gifts: 'Gifts',
+    Office: 'Office',
+    Other: 'Other',
+  },
+};
+
+const he: Dict = {
+  common: { appName: 'FinFlow', loading: 'טוען...' },
+  nav: {
+    dashboard: 'לוח בקרה',
+    upload: 'העלאה',
+    transactions: 'עסקאות',
+    settings: 'הגדרות',
+    logout: 'התנתקות',
+    switchTo: 'EN',
+  },
+  login: {
+    title: 'התחברות',
+    subtitle: 'נהל את הכספים שלך בקלות',
+    email: 'אימייל',
+    password: 'סיסמה',
+    signIn: 'התחברות',
+    signingIn: 'מתחבר...',
+    noAccount: 'אין לך חשבון?',
+    signUp: 'הרשמה',
+    demo: 'מצב הדגמה: כל אימייל/סיסמה יעבדו',
+    failed: 'ההתחברות נכשלה',
+    error: 'אירעה שגיאה. נסה שוב.',
+  },
+  signup: {
+    title: 'הרשמה',
+    subtitle: 'התחל לעקוב אחר הכספים שלך',
+    fullName: 'שם מלא',
+    fullNamePlaceholder: 'ישראל ישראלי',
+    email: 'אימייל',
+    password: 'סיסמה',
+    confirmPassword: 'אימות סיסמה',
+    createAccount: 'יצירת חשבון',
+    creatingAccount: 'יוצר חשבון...',
+    haveAccount: 'כבר יש לך חשבון?',
+    signIn: 'התחברות',
+    demo: 'מצב הדגמה: כל ההרשמות נוצרות מיידית',
+    mismatch: 'הסיסמאות אינן תואמות',
+    failed: 'ההרשמה נכשלה',
+    error: 'אירעה שגיאה. נסה שוב.',
+  },
+  dashboard: {
+    title: 'לוח בקרה',
+    subtitle: 'עקוב אחר הכספים ודפוסי ההוצאות שלך במבט אחד',
+    totalIncome: 'סך הכנסות',
+    totalExpenses: 'סך הוצאות',
+    totalSavings: 'סך חיסכון',
+    savingsRate: 'שיעור חיסכון',
+    pctOfIncome: '{pct}% מההכנסה',
+    thisMonth: 'החודש',
+    topCategories: 'קטגוריות הוצאה מובילות',
+    last30: '30 הימים האחרונים',
+    pctOfExpenses: '{pct}% מההוצאות',
+    summary: 'סיכום',
+    income: 'הכנסה',
+    mustHave: 'חיוני',
+    luxury: 'מותרות',
+    netSavings: 'חיסכון נטו',
+    noData: 'אין נתונים עדיין',
+    noDataSub: 'התחל בהעלאת הקובץ הראשון שלך',
+    uploadFile: 'העלאת קובץ',
+    ctaTitle: 'מוכן להוסיף עוד נתונים?',
+    ctaSub: 'העלה עסקאות ממקורות שונים כדי לקבל תמונה מלאה של הכספים שלך',
+    uploadNew: 'העלאת קובץ חדש',
+  },
+  upload: {
+    title: 'העלאת עסקאות',
+    subtitle: 'ייבא דפי בנק או ייצוא משירותי תשלום כדי לנתח את ההוצאות שלך',
+    selectSource: 'בחר מקור נתונים',
+    fileLabel: 'העלאת קובץ',
+    dragDrop: 'גרור ושחרר את הקובץ כאן',
+    orClick: 'או לחץ לבחירה • תומך בקבצי CSV ו-Excel',
+    selected: 'נבחר: {name}',
+    processing: 'מעבד...',
+    uploadProcess: 'העלאה ועיבוד',
+    previewTitle: 'תצוגה מקדימה (5 העסקאות הראשונות)',
+    thDate: 'תאריך',
+    thMerchant: 'בית עסק',
+    thAmount: 'סכום',
+    thCategory: 'קטגוריה',
+    uncategorized: 'לא מסווג',
+    errorSelect: 'אנא בחר קובץ',
+    errorUpload: 'שגיאה בהעלאת הקובץ',
+    error: 'אירעה שגיאה',
+    success: '✓ הקובץ עובד בהצלחה! נשמרו {count} עסקאות',
+    info1Title: 'פורמטים נתמכים',
+    info1Desc: 'קבצי CSV ו-Excel מכל בנק או שירות תשלום',
+    info2Title: 'מאובטח ופרטי',
+    info2Desc: 'כל העסקאות מעובדות בצורה מאובטחת ומוצפנת',
+    info3Title: 'סיווג אוטומטי',
+    info3Desc: 'העסקאות מסווגות אוטומטית וניתנות לעריכה',
+  },
+  sources: {
+    bank: 'בנק',
+    bit: 'ביט',
+    paypal: 'PayPal',
+    google_pay: 'Google Pay',
+    apple_pay: 'Apple Pay',
+    credit_card: 'כרטיס אשראי',
+  },
+  transactions: {
+    title: 'עסקאות',
+    subtitle: 'סקור, סנן ונהל את העסקאות שלך',
+    search: 'חיפוש לפי בית עסק...',
+    allCategories: 'כל הקטגוריות',
+    allTypes: 'כל הסוגים',
+    mustHave: 'חיוני',
+    luxury: 'מותרות',
+    thDate: 'תאריך',
+    thMerchant: 'בית עסק',
+    thAmount: 'סכום',
+    thCategory: 'קטגוריה',
+    thType: 'סוג',
+    thSource: 'מקור',
+    none: 'לא נמצאו עסקאות',
+    totalTransactions: 'סך עסקאות',
+    totalAmount: 'סכום כולל',
+    avgTransaction: 'עסקה ממוצעת',
+    reCategorize: 'לחץ לשינוי קטגוריה',
+  },
+  settings: {
+    title: 'הגדרות',
+    subtitle: 'נהל את החשבון, ההעדפות והאינטגרציות שלך',
+    tabGeneral: 'כללי',
+    tabHousehold: 'משק בית',
+    tabCategories: 'קטגוריות',
+    tabNotifications: 'התראות',
+    generalTitle: 'הגדרות כלליות',
+    generalSub: 'התאם את חוויית השימוש שלך',
+    emailAddress: 'כתובת אימייל',
+    currency: 'מטבע מועדף',
+    dateFormat: 'פורמט תאריך',
+    saveChanges: 'שמירת שינויים',
+    inviteTitle: 'הזמן את בן/בת הזוג',
+    inviteSub:
+      'צור חשבון משק בית משותף לצפייה בכספים משולבים וסנכרון נתוני הוצאות',
+    spouseEmail: 'אימייל בן/בת הזוג',
+    sendInvite: 'שליחת הזמנה',
+    membersTitle: 'חברי משק הבית',
+    membersEmpty: 'רק אתה בינתיים. הזמן את בן/בת הזוג כדי להתחיל!',
+    categoryRules: 'כללי קטגוריות',
+    categoryRulesSub: 'התאם כיצד עסקאות מסווגות אוטומטית',
+    addRule: 'הוספת כלל חדש',
+    notifTitle: 'העדפות התראות',
+    notifSub: 'בחר אילו התראות תרצה לקבל',
+    notifBudget: 'התראות תקציב',
+    notifBudgetDesc: 'קבל התראה כשההוצאות חורגות מהתקציב',
+    notifWeekly: 'סיכום שבועי',
+    notifWeeklyDesc: 'קבל סיכום שבועי של ההוצאות שלך',
+    notifNew: 'עסקאות חדשות',
+    notifNewDesc: 'קבל התראה כשמיובאות עסקאות חדשות',
+    savePrefs: 'שמירת העדפות',
+  },
+  categories: {
+    Groceries: 'מצרכים',
+    Dining: 'מסעדות',
+    Shopping: 'קניות',
+    Transportation: 'תחבורה',
+    Travel: 'נסיעות',
+    Entertainment: 'בידור',
+    Subscriptions: 'מנויים',
+    Health: 'בריאות',
+    Utilities: 'שירותים',
+    Housing: 'דיור',
+    Insurance: 'ביטוח',
+    Education: 'חינוך',
+    'Personal Care': 'טיפוח אישי',
+    Pets: 'חיות מחמד',
+    Gifts: 'מתנות',
+    Office: 'משרד',
+    Other: 'אחר',
+  },
+};
+
+const dictionaries: Record<Lang, Dict> = { en, he };
+
+function resolve(dict: Dict, key: string): unknown {
+  return key.split('.').reduce<any>((obj, part) => obj?.[part], dict);
+}
+
+export type TFunction = (
+  key: string,
+  params?: Record<string, string | number>
+) => string;
+
+interface I18nValue {
+  lang: Lang;
+  dir: 'rtl' | 'ltr';
+  setLang: (lang: Lang) => void;
+  toggle: () => void;
+  t: TFunction;
+}
+
+const I18nContext = createContext<I18nValue | null>(null);
+
+export function LanguageProvider({ children }: { children: ReactNode }) {
+  // Default to Hebrew (RTL). Deterministic on first render to avoid
+  // hydration mismatches; localStorage is read after mount.
+  const [lang, setLangState] = useState<Lang>('he');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('lang');
+    if (saved === 'he' || saved === 'en') setLangState(saved);
+  }, []);
+
+  const dir: 'rtl' | 'ltr' = lang === 'he' ? 'rtl' : 'ltr';
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = dir;
+  }, [lang, dir]);
+
+  const setLang = useCallback((next: Lang) => {
+    setLangState(next);
+    try {
+      localStorage.setItem('lang', next);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggle = useCallback(() => {
+    setLangState((prev) => {
+      const next = prev === 'he' ? 'en' : 'he';
+      try {
+        localStorage.setItem('lang', next);
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+
+  const t = useCallback<TFunction>(
+    (key, params) => {
+      const raw = resolve(dictionaries[lang], key);
+      if (typeof raw !== 'string') return key;
+      if (!params) return raw;
+      return raw.replace(/\{(\w+)\}/g, (_, name) =>
+        String(params[name] ?? '')
+      );
+    },
+    [lang]
+  );
+
+  return (
+    <I18nContext.Provider value={{ lang, dir, setLang, toggle, t }}>
+      {children}
+    </I18nContext.Provider>
+  );
+}
+
+export function useI18n(): I18nValue {
+  const ctx = useContext(I18nContext);
+  if (!ctx) {
+    throw new Error('useI18n must be used within a LanguageProvider');
+  }
+  return ctx;
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import { useI18n } from '@/lib/i18n';
 
 interface Transaction {
   id: string;
@@ -14,6 +15,7 @@ interface Transaction {
 
 export default function Transactions() {
   const router = useRouter();
+  const { t } = useI18n();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -130,7 +132,7 @@ export default function Transactions() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-2xl text-slate-300">Loading...</div>
+        <div className="text-2xl text-slate-300">{t('common.loading')}</div>
       </div>
     );
   }
@@ -138,18 +140,16 @@ export default function Transactions() {
   return (
     <>
       <Head>
-        <title>Transactions - FinFlow</title>
+        <title>{t('transactions.title')} - FinFlow</title>
       </Head>
 
       <div className="space-y-8">
         {/* Header */}
         <div>
           <h1 className="text-5xl font-black mb-3 bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
-            Transactions
+            {t('transactions.title')}
           </h1>
-          <p className="text-slate-400 text-lg">
-            Review, filter, and manage your transactions
-          </p>
+          <p className="text-slate-400 text-lg">{t('transactions.subtitle')}</p>
         </div>
 
         {/* Filters */}
@@ -158,12 +158,12 @@ export default function Transactions() {
           <div className="relative">
             <input
               type="text"
-              placeholder="Search by merchant..."
+              placeholder={t('transactions.search')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-5 py-3 pl-12 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+              className="w-full px-5 py-3 ps-12 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
             />
-            <span className="absolute left-4 top-3.5 text-xl">🔍</span>
+            <span className="absolute start-4 top-3.5 text-xl">🔍</span>
           </div>
 
           {/* Category Filter */}
@@ -174,7 +174,9 @@ export default function Transactions() {
           >
             {categories.map((cat) => (
               <option key={cat} value={cat}>
-                {cat === 'all' ? '📊 All Categories' : cat}
+                {cat === 'all'
+                  ? `📊 ${t('transactions.allCategories')}`
+                  : t(`categories.${cat}`)}
               </option>
             ))}
           </select>
@@ -189,9 +191,9 @@ export default function Transactions() {
             }
             className="px-5 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
           >
-            <option value="all">🔹 All Types</option>
-            <option value="must_have">🏠 Must-Have</option>
-            <option value="luxury">✨ Luxury</option>
+            <option value="all">🔹 {t('transactions.allTypes')}</option>
+            <option value="must_have">🏠 {t('transactions.mustHave')}</option>
+            <option value="luxury">✨ {t('transactions.luxury')}</option>
           </select>
 
           {/* Date Range Filter */}
@@ -219,30 +221,30 @@ export default function Transactions() {
           {filteredTransactions.length === 0 ? (
             <div className="p-12 text-center">
               <p className="text-4xl mb-3">🚫</p>
-              <p className="text-slate-400 text-lg">No transactions found</p>
+              <p className="text-slate-400 text-lg">{t('transactions.none')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-700/50 border-b border-slate-600/50">
                   <tr>
-                    <th className="text-left px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
-                      📅 Date
+                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
+                      📅 {t('transactions.thDate')}
                     </th>
-                    <th className="text-left px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
-                      🛍️ Merchant
+                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
+                      🛍️ {t('transactions.thMerchant')}
                     </th>
-                    <th className="text-right px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
-                      💵 Amount
+                    <th className="text-end px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
+                      💵 {t('transactions.thAmount')}
                     </th>
-                    <th className="text-left px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
-                      📂 Category
+                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
+                      📂 {t('transactions.thCategory')}
                     </th>
-                    <th className="text-left px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
-                      🏷️ Type
+                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
+                      🏷️ {t('transactions.thType')}
                     </th>
-                    <th className="text-left px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
-                      📍 Source
+                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
+                      📍 {t('transactions.thSource')}
                     </th>
                   </tr>
                 </thead>
@@ -262,7 +264,7 @@ export default function Transactions() {
                       <td className="px-6 py-4 text-slate-100 font-semibold">
                         {tx.merchant}
                       </td>
-                      <td className="px-6 py-4 text-right font-bold text-slate-100">
+                      <td className="px-6 py-4 text-end font-bold text-slate-100">
                         ${Math.abs(tx.amount).toFixed(2)}
                       </td>
                       <td className="px-6 py-4">
@@ -278,7 +280,7 @@ export default function Transactions() {
                           >
                             {CATEGORY_OPTIONS.map((c) => (
                               <option key={c} value={c}>
-                                {c}
+                                {t(`categories.${c}`)}
                               </option>
                             ))}
                           </select>
@@ -286,10 +288,10 @@ export default function Transactions() {
                           <button
                             type="button"
                             onClick={() => setEditingId(tx.id)}
-                            title="Click to re-categorize"
+                            title={t('transactions.reCategorize')}
                             className="px-4 py-2 bg-emerald-600/30 text-emerald-200 text-xs font-semibold rounded-full hover:bg-emerald-600/50 transition-colors cursor-pointer"
                           >
-                            {tx.category} ✎
+                            {t(`categories.${tx.category}`)} ✎
                           </button>
                         )}
                       </td>
@@ -302,8 +304,8 @@ export default function Transactions() {
                           }`}
                         >
                           {tx.classification === 'must_have'
-                            ? '🏠 Must-Have'
-                            : '✨ Luxury'}
+                            ? `🏠 ${t('transactions.mustHave')}`
+                            : `✨ ${t('transactions.luxury')}`}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-slate-400 text-sm font-medium">
@@ -322,13 +324,13 @@ export default function Transactions() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <StatCard
               icon="📊"
-              label="Total Transactions"
+              label={t('transactions.totalTransactions')}
               value={filteredTransactions.length.toString()}
               color="emerald"
             />
             <StatCard
               icon="💸"
-              label="Total Amount"
+              label={t('transactions.totalAmount')}
               value={`$${Math.abs(
                 filteredTransactions.reduce((sum, t) => sum + t.amount, 0)
               ).toFixed(2)}`}
@@ -336,7 +338,7 @@ export default function Transactions() {
             />
             <StatCard
               icon="📈"
-              label="Average Transaction"
+              label={t('transactions.avgTransaction')}
               value={`$${(
                 Math.abs(
                   filteredTransactions.reduce((sum, t) => sum + t.amount, 0)

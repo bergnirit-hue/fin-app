@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import { useI18n } from '@/lib/i18n';
 
 export default function Settings() {
   const router = useRouter();
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState('general');
   const [showHouseholdForm, setShowHouseholdForm] = useState(false);
   const [householdCode, setHouseholdCode] = useState('');
@@ -36,18 +38,16 @@ export default function Settings() {
   return (
     <>
       <Head>
-        <title>Settings - FinFlow</title>
+        <title>{t('settings.title')} - FinFlow</title>
       </Head>
 
       <div className="space-y-8">
         {/* Header */}
         <div>
           <h1 className="text-5xl font-black mb-3 bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
-            Settings
+            {t('settings.title')}
           </h1>
-          <p className="text-slate-400 text-lg">
-            Manage your account, preferences, and integrations
-          </p>
+          <p className="text-slate-400 text-lg">{t('settings.subtitle')}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -56,18 +56,18 @@ export default function Settings() {
             <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl overflow-hidden shadow-lg">
               <nav className="flex flex-col divide-y divide-slate-700/50">
                 {[
-                  { id: 'general', label: 'General', icon: '⚙️' },
-                  { id: 'household', label: 'Household', icon: '👥' },
-                  { id: 'categories', label: 'Categories', icon: '📂' },
-                  { id: 'notifications', label: 'Notifications', icon: '🔔' },
+                  { id: 'general', label: t('settings.tabGeneral'), icon: '⚙️' },
+                  { id: 'household', label: t('settings.tabHousehold'), icon: '👥' },
+                  { id: 'categories', label: t('settings.tabCategories'), icon: '📂' },
+                  { id: 'notifications', label: t('settings.tabNotifications'), icon: '🔔' },
                 ].map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`text-left px-6 py-4 font-semibold transition-all duration-200 ${
+                    className={`text-start px-6 py-4 font-semibold transition-all duration-200 ${
                       activeTab === tab.id
-                        ? 'bg-gradient-to-r from-emerald-600/20 to-emerald-600/5 text-emerald-400 border-l-4 border-emerald-400'
-                        : 'text-slate-300 hover:bg-slate-600/30 border-l-4 border-transparent'
+                        ? 'bg-gradient-to-r from-emerald-600/20 to-emerald-600/5 text-emerald-400 border-s-4 border-emerald-400'
+                        : 'text-slate-300 hover:bg-slate-600/30 border-s-4 border-transparent'
                     }`}
                   >
                     <span className="flex items-center gap-3">
@@ -87,21 +87,21 @@ export default function Settings() {
               <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl p-8 space-y-6 shadow-lg">
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-                    <span>⚙️</span> General Settings
+                    <span>⚙️</span> {t('settings.generalTitle')}
                   </h2>
-                  <p className="text-slate-400">Customize your app experience</p>
+                  <p className="text-slate-400">{t('settings.generalSub')}</p>
                 </div>
 
                 <div className="space-y-5 pt-4">
                   <SettingField
-                    label="Email Address"
+                    label={t('settings.emailAddress')}
                     icon="📧"
                     disabled
                     value={user?.email || ''}
                   />
 
                   <SettingSelect
-                    label="Preferred Currency"
+                    label={t('settings.currency')}
                     icon="💱"
                     options={[
                       { value: 'usd', label: 'USD ($)' },
@@ -112,7 +112,7 @@ export default function Settings() {
                   />
 
                   <SettingSelect
-                    label="Date Format"
+                    label={t('settings.dateFormat')}
                     icon="📅"
                     options={[
                       { value: 'mmddyyyy', label: 'MM/DD/YYYY' },
@@ -123,7 +123,7 @@ export default function Settings() {
                 </div>
 
                 <button className="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 mt-6">
-                  💾 Save Changes
+                  💾 {t('settings.saveChanges')}
                 </button>
               </div>
             )}
@@ -133,16 +133,14 @@ export default function Settings() {
               <div className="space-y-6">
                 <div className="bg-gradient-to-br from-emerald-600/20 to-emerald-600/5 backdrop-blur border border-emerald-500/30 rounded-2xl p-8 shadow-lg">
                   <h3 className="text-2xl font-bold text-white mb-3 flex items-center gap-2">
-                    <span>👥</span> Invite Your Spouse
+                    <span>👥</span> {t('settings.inviteTitle')}
                   </h3>
-                  <p className="text-slate-400 mb-6">
-                    Create a shared household account to view combined finances and sync spending data
-                  </p>
+                  <p className="text-slate-400 mb-6">{t('settings.inviteSub')}</p>
 
                   <form onSubmit={handleInviteSpouse} className="space-y-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-300 mb-3">
-                        Spouse Email Address
+                        {t('settings.spouseEmail')}
                       </label>
                       <input
                         type="email"
@@ -157,18 +155,18 @@ export default function Settings() {
                       type="submit"
                       className="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
                     >
-                      📨 Send Invite
+                      📨 {t('settings.sendInvite')}
                     </button>
                   </form>
                 </div>
 
                 <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl p-8 shadow-lg">
                   <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-                    <span>👫</span> Household Members
+                    <span>👫</span> {t('settings.membersTitle')}
                   </h3>
                   <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600/50">
                     <p className="text-slate-400 text-center py-6">
-                      📌 Only you for now. Invite your spouse to get started!
+                      📌 {t('settings.membersEmpty')}
                     </p>
                   </div>
                 </div>
@@ -180,9 +178,9 @@ export default function Settings() {
               <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl p-8 space-y-6 shadow-lg">
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-                    <span>📂</span> Category Rules
+                    <span>📂</span> {t('settings.categoryRules')}
                   </h2>
-                  <p className="text-slate-400">Customize how transactions are automatically categorized</p>
+                  <p className="text-slate-400">{t('settings.categoryRulesSub')}</p>
                 </div>
 
                 <div className="space-y-3 pt-4">
@@ -200,7 +198,7 @@ export default function Settings() {
                         <div>
                           <p className="text-white font-semibold">{rule.merchant}</p>
                           <p className="text-slate-400 text-sm">
-                            → {rule.category}
+                            → {t(`categories.${rule.category}`)}
                           </p>
                         </div>
                       </div>
@@ -212,7 +210,7 @@ export default function Settings() {
                 </div>
 
                 <button className="w-full px-6 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 mt-4">
-                  ➕ Add New Rule
+                  ➕ {t('settings.addRule')}
                 </button>
               </div>
             )}
@@ -222,26 +220,26 @@ export default function Settings() {
               <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl p-8 space-y-6 shadow-lg">
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-                    <span>🔔</span> Notification Preferences
+                    <span>🔔</span> {t('settings.notifTitle')}
                   </h2>
-                  <p className="text-slate-400">Choose what notifications you'd like to receive</p>
+                  <p className="text-slate-400">{t('settings.notifSub')}</p>
                 </div>
 
                 <div className="space-y-3 pt-4">
                   {[
                     {
-                      name: 'Budget Alerts',
-                      description: 'Notify when spending exceeds budget',
+                      name: t('settings.notifBudget'),
+                      description: t('settings.notifBudgetDesc'),
                       icon: '⚠️',
                     },
                     {
-                      name: 'Weekly Summary',
-                      description: 'Get a weekly summary of your spending',
+                      name: t('settings.notifWeekly'),
+                      description: t('settings.notifWeeklyDesc'),
                       icon: '📊',
                     },
                     {
-                      name: 'New Transactions',
-                      description: 'Notify when new transactions are imported',
+                      name: t('settings.notifNew'),
+                      description: t('settings.notifNewDesc'),
                       icon: '📥',
                     },
                   ].map((notif, idx) => (
@@ -266,7 +264,7 @@ export default function Settings() {
                             className="sr-only"
                           />
                           <div className="w-10 h-6 bg-emerald-600 rounded-full shadow-inner"></div>
-                          <div className="absolute left-1 top-1 bg-white w-4 h-4 rounded-full shadow transition-transform"></div>
+                          <div className="absolute start-1 top-1 bg-white w-4 h-4 rounded-full shadow transition-transform"></div>
                         </div>
                       </label>
                     </div>
@@ -274,7 +272,7 @@ export default function Settings() {
                 </div>
 
                 <button className="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 mt-6">
-                  💾 Save Preferences
+                  💾 {t('settings.savePrefs')}
                 </button>
               </div>
             )}

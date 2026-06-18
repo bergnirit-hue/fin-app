@@ -1,9 +1,11 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import { useI18n } from '@/lib/i18n';
 
 export default function Upload() {
   const router = useRouter();
+  const { t } = useI18n();
   const [file, setFile] = useState<File | null>(null);
   const [sourceType, setSourceType] = useState('bank');
   const [loading, setLoading] = useState(false);
@@ -48,7 +50,7 @@ export default function Upload() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) {
-      setError('Please select a file');
+      setError(t('upload.errorSelect'));
       return;
     }
 
@@ -71,7 +73,7 @@ export default function Upload() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.message || 'Error uploading file');
+        setError(data.message || t('upload.errorUpload'));
         setLoading(false);
         return;
       }
@@ -81,7 +83,9 @@ export default function Upload() {
       }
 
       setSuccess(
-        `✓ File processed successfully! ${data.transactionCount} transactions found`
+        t('upload.success', {
+          count: data.savedCount ?? data.transactionCount ?? 0,
+        })
       );
       setFile(null);
       if (fileInputRef.current) {
@@ -91,44 +95,40 @@ export default function Upload() {
 
       setTimeout(() => router.push('/'), 2000);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'An error occurred'
-      );
+      setError(err instanceof Error ? err.message : t('upload.error'));
       setLoading(false);
     }
   };
 
   const sourceOptions = [
-    { id: 'bank', label: 'Bank', icon: '🏦' },
-    { id: 'bit', label: 'Bit', icon: <BitLogo /> },
-    { id: 'paypal', label: 'PayPal', icon: <PayPalLogo /> },
-    { id: 'google_pay', label: 'Google Pay', icon: <GooglePayLogo /> },
-    { id: 'apple_pay', label: 'Apple Pay', icon: <ApplePayLogo /> },
-    { id: 'credit_card', label: 'Credit Card', icon: '💳' },
+    { id: 'bank', icon: '🏦' },
+    { id: 'bit', icon: <BitLogo /> },
+    { id: 'paypal', icon: <PayPalLogo /> },
+    { id: 'google_pay', icon: <GooglePayLogo /> },
+    { id: 'apple_pay', icon: <ApplePayLogo /> },
+    { id: 'credit_card', icon: '💳' },
   ];
 
   return (
     <>
       <Head>
-        <title>Upload - FinFlow</title>
+        <title>{t('upload.title')} - FinFlow</title>
       </Head>
 
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div>
           <h1 className="text-5xl font-black mb-3 bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
-            Upload Transactions
+            {t('upload.title')}
           </h1>
-          <p className="text-slate-400 text-lg">
-            Import your bank statements or payment service exports to analyze your spending
-          </p>
+          <p className="text-slate-400 text-lg">{t('upload.subtitle')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Source Type Selection */}
           <div>
             <label className="block text-sm font-bold text-slate-200 mb-4 uppercase tracking-wide">
-              📊 Select Data Source
+              📊 {t('upload.selectSource')}
             </label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {sourceOptions.map((source) => (
@@ -145,7 +145,7 @@ export default function Upload() {
                   <div className="h-8 flex items-center justify-center mb-1 text-2xl">
                     {source.icon}
                   </div>
-                  <div className="text-sm">{source.label}</div>
+                  <div className="text-sm">{t(`sources.${source.id}`)}</div>
                 </button>
               ))}
             </div>
@@ -154,7 +154,7 @@ export default function Upload() {
           {/* File Upload Drop Zone */}
           <div>
             <label className="block text-sm font-bold text-slate-200 mb-4 uppercase tracking-wide">
-              📁 Upload File
+              📁 {t('upload.fileLabel')}
             </label>
             <div
               onDragEnter={handleDrag}
@@ -183,12 +183,10 @@ export default function Upload() {
                 </p>
                 <p className="text-slate-200 font-bold text-lg">
                   {file
-                    ? `Selected: ${file.name}`
-                    : 'Drag and drop your file here'}
+                    ? t('upload.selected', { name: file.name })
+                    : t('upload.dragDrop')}
                 </p>
-                <p className="text-slate-400 text-sm">
-                  or click to browse • Supports CSV and Excel files
-                </p>
+                <p className="text-slate-400 text-sm">{t('upload.orClick')}</p>
               </div>
             </div>
           </div>
@@ -211,16 +209,16 @@ export default function Upload() {
           {preview.length > 0 && (
             <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl p-8 shadow-xl">
               <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <span>👀</span> Preview (first 5 transactions)
+                <span>👀</span> {t('upload.previewTitle')}
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="border-b-2 border-slate-600">
                     <tr className="text-slate-300">
-                      <th className="text-left py-3 font-semibold">Date</th>
-                      <th className="text-left py-3 font-semibold">Merchant</th>
-                      <th className="text-right py-3 font-semibold">Amount</th>
-                      <th className="text-left py-3 font-semibold">Category</th>
+                      <th className="text-start py-3 font-semibold">{t('upload.thDate')}</th>
+                      <th className="text-start py-3 font-semibold">{t('upload.thMerchant')}</th>
+                      <th className="text-end py-3 font-semibold">{t('upload.thAmount')}</th>
+                      <th className="text-start py-3 font-semibold">{t('upload.thCategory')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700">
@@ -235,12 +233,14 @@ export default function Upload() {
                         <td className="py-3 text-slate-200 font-medium">
                           {tx.merchant}
                         </td>
-                        <td className="text-right py-3 text-slate-200 font-semibold">
+                        <td className="text-end py-3 text-slate-200 font-semibold">
                           ${Math.abs(tx.amount).toFixed(2)}
                         </td>
                         <td className="py-3">
                           <span className="px-3 py-1 bg-emerald-600/30 text-emerald-200 text-xs font-semibold rounded-full">
-                            {tx.category || 'Uncategorized'}
+                            {tx.category
+                              ? t(`categories.${tx.category}`)
+                              : t('upload.uncategorized')}
                           </span>
                         </td>
                       </tr>
@@ -259,11 +259,11 @@ export default function Upload() {
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="animate-spin">⏳</span> Processing...
+                <span className="animate-spin">⏳</span> {t('upload.processing')}
               </span>
             ) : (
               <span className="flex items-center justify-center gap-2">
-                📤 Upload & Process
+                📤 {t('upload.uploadProcess')}
               </span>
             )}
           </button>
@@ -273,20 +273,20 @@ export default function Upload() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <InfoCard
             icon="💾"
-            title="Supported Formats"
-            description="CSV and Excel files from any bank or payment service"
+            title={t('upload.info1Title')}
+            description={t('upload.info1Desc')}
             color="emerald"
           />
           <InfoCard
             icon="🔒"
-            title="Secure & Private"
-            description="All transactions are processed securely and encrypted"
+            title={t('upload.info2Title')}
+            description={t('upload.info2Desc')}
             color="cyan"
           />
           <InfoCard
             icon="✨"
-            title="Auto-Categorized"
-            description="Transactions are automatically categorized and editable"
+            title={t('upload.info3Title')}
+            description={t('upload.info3Desc')}
             color="violet"
           />
         </div>

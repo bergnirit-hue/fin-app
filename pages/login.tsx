@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Head from 'next/head';
+import { useI18n } from '@/lib/i18n';
 
 export default function Login() {
   const router = useRouter();
+  const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,7 +26,7 @@ export default function Login() {
 
       if (!response.ok) {
         const data = await response.json();
-        setError(data.message || 'Login failed');
+        setError(data.message || t('login.failed'));
         setLoading(false);
         return;
       }
@@ -33,7 +35,7 @@ export default function Login() {
       localStorage.setItem('token', data.token);
       router.push('/');
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      setError(t('login.error'));
       setLoading(false);
     }
   };
@@ -41,7 +43,7 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>Login - FinFlow</title>
+        <title>{t('login.title')} - FinFlow</title>
       </Head>
 
       <div className="min-h-screen flex items-center justify-center">
@@ -52,16 +54,14 @@ export default function Login() {
               <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                 FinFlow
               </h1>
-              <p className="text-slate-400 mt-2">
-                Track your finances with ease
-              </p>
+              <p className="text-slate-400 mt-2">{t('login.subtitle')}</p>
             </div>
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Email
+                  {t('login.email')}
                 </label>
                 <input
                   type="email"
@@ -75,7 +75,7 @@ export default function Login() {
 
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Password
+                  {t('login.password')}
                 </label>
                 <input
                   type="password"
@@ -98,26 +98,24 @@ export default function Login() {
                 disabled={loading}
                 className="w-full px-4 py-2 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-lg font-medium transition disabled:opacity-50"
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {loading ? t('login.signingIn') : t('login.signIn')}
               </button>
             </form>
 
             {/* Signup Link */}
             <p className="text-center text-slate-400 mt-6">
-              Don't have an account?{' '}
+              {t('login.noAccount')}{' '}
               <Link
                 href="/signup"
                 className="text-emerald-400 hover:text-emerald-300 font-medium transition"
               >
-                Sign up
+                {t('login.signUp')}
               </Link>
             </p>
 
             {/* Demo Note */}
             <div className="mt-8 p-4 bg-slate-600/50 rounded-lg border border-slate-500/50">
-              <p className="text-xs text-slate-400 text-center">
-                Demo mode: Any email/password will work
-              </p>
+              <p className="text-xs text-slate-400 text-center">{t('login.demo')}</p>
             </div>
           </div>
         </div>
