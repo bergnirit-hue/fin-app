@@ -1,8 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { IncomingForm } from 'formidable';
 import fs from 'fs';
-import { Readable } from 'stream';
-import csvParser from 'csv-parser';
 import * as XLSX from 'xlsx';
 import prisma from '@/lib/utils/db';
 import { extractUserFromRequest } from '@/lib/utils/auth';
@@ -26,18 +24,6 @@ export const config = {
     bodyParser: false,
   },
 };
-
-// Read CSV rows as raw objects (header-keyed) so we can auto-detect columns.
-function readCsvRows(buffer: Buffer): Promise<any[]> {
-  return new Promise((resolve, reject) => {
-    const rows: any[] = [];
-    Readable.from([buffer])
-      .pipe(csvParser())
-      .on('data', (row: any) => rows.push(row))
-      .on('end', () => resolve(rows))
-      .on('error', reject);
-  });
-}
 
 // Build the dedup key used to detect transactions already in the DB.
 // Mirrors the exact-match semantics in DeduplicationEngine (date + amount + merchant).
@@ -87,7 +73,7 @@ export default async function handler(
       // Use the provided mapping, or auto-detect from the CSV headers.
       let mapping = columnMapping;
       if (!mapping) {
-        const rows = await readCsvRows(buffer);
+        const rows = await TransactionParser.readRawRows(buffer);
         mapping = TransactionParser.detectColumns(rows);
         if (!mapping) {
           return res.status(200).json({
