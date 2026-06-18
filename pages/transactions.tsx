@@ -22,6 +22,7 @@ export default function Transactions() {
     useState<'all' | 'must_have' | 'luxury'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const categories = [
     'all',
@@ -36,6 +37,53 @@ export default function Transactions() {
     'Education',
     'Other',
   ];
+
+  // Full category set offered by the inline re-categorization editor —
+  // matches the keys the ClassificationEngine knows about so the
+  // must-have / luxury type is re-derived correctly on save.
+  const CATEGORY_OPTIONS = [
+    'Groceries',
+    'Dining',
+    'Shopping',
+    'Transportation',
+    'Travel',
+    'Entertainment',
+    'Subscriptions',
+    'Health',
+    'Utilities',
+    'Housing',
+    'Insurance',
+    'Education',
+    'Personal Care',
+    'Pets',
+    'Gifts',
+    'Office',
+    'Other',
+  ];
+
+  const handleCategorize = async (id: string, category: string) => {
+    setEditingId(null);
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const res = await fetch(`/api/transactions/${id}/categorize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ category }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setTransactions((prev) =>
+        prev.map((t) => (t.id === id ? data.transaction : t))
+      );
+    } catch {
+      // keep the existing value on failure
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -218,9 +266,32 @@ export default function Transactions() {
                         ${Math.abs(tx.amount).toFixed(2)}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="px-4 py-2 bg-emerald-600/30 text-emerald-200 text-xs font-semibold rounded-full">
-                          {tx.category}
-                        </span>
+                        {editingId === tx.id ? (
+                          <select
+                            autoFocus
+                            value={tx.category}
+                            onChange={(e) =>
+                              handleCategorize(tx.id, e.target.value)
+                            }
+                            onBlur={() => setEditingId(null)}
+                            className="px-3 py-2 bg-slate-700 border border-emerald-500/50 rounded-lg text-emerald-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                          >
+                            {CATEGORY_OPTIONS.map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(tx.id)}
+                            title="Click to re-categorize"
+                            className="px-4 py-2 bg-emerald-600/30 text-emerald-200 text-xs font-semibold rounded-full hover:bg-emerald-600/50 transition-colors cursor-pointer"
+                          >
+                            {tx.category} ✎
+                          </button>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <span
