@@ -258,11 +258,11 @@ export default function Upload() {
             className="w-full px-8 py-4 bg-gradient-to-r from-emerald-500 via-cyan-500 to-violet-500 hover:from-emerald-600 hover:via-cyan-600 hover:to-violet-600 text-white rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 shadow-lg hover:shadow-2xl"
           >
             {loading ? (
-              <span className="flex items-center justify-center gap-2">
+              <span dir="ltr" className="flex items-center justify-center gap-2">
                 <span className="animate-spin">⏳</span> {t('upload.processing')}
               </span>
             ) : (
-              <span className="flex items-center justify-center gap-2">
+              <span dir="ltr" className="flex items-center justify-center gap-2">
                 📤 {t('upload.uploadProcess')}
               </span>
             )}
