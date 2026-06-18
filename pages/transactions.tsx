@@ -15,14 +15,13 @@ interface Transaction {
 export default function Transactions() {
   const router = useRouter();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [filteredTransactions, setFilteredTransactions] = useState<
-    Transaction[]
-  >([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [classificationFilter, setClassificationFilter] =
     useState<'all' | 'must_have' | 'luxury'>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const categories = [
     'all',
@@ -45,80 +44,40 @@ export default function Transactions() {
       return;
     }
 
-    // Load demo transactions
-    const demoTransactions: Transaction[] = [
-      {
-        id: '1',
-        date: new Date(Date.now() - 86400000 * 5).toISOString(),
-        merchant: 'Whole Foods',
-        amount: -125.42,
-        category: 'Groceries',
-        classification: 'must_have',
-        sourceType: 'bank',
-      },
-      {
-        id: '2',
-        date: new Date(Date.now() - 86400000 * 4).toISOString(),
-        merchant: 'Starbucks',
-        amount: -6.25,
-        category: 'Dining',
-        classification: 'luxury',
-        sourceType: 'bank',
-      },
-      {
-        id: '3',
-        date: new Date(Date.now() - 86400000 * 3).toISOString(),
-        merchant: 'Amazon',
-        amount: -45.99,
-        category: 'Shopping',
-        classification: 'luxury',
-        sourceType: 'bank',
-      },
-      {
-        id: '4',
-        date: new Date(Date.now() - 86400000 * 2).toISOString(),
-        merchant: 'Gym Membership',
-        amount: -50.0,
-        category: 'Health',
-        classification: 'must_have',
-        sourceType: 'bank',
-      },
-      {
-        id: '5',
-        date: new Date(Date.now() - 86400000).toISOString(),
-        merchant: 'Restaurant XYZ',
-        amount: -85.5,
-        category: 'Dining',
-        classification: 'luxury',
-        sourceType: 'bank',
-      },
-    ];
+    const params = new URLSearchParams();
+    if (selectedCategory !== 'all') params.set('category', selectedCategory);
+    if (classificationFilter !== 'all')
+      params.set('classification', classificationFilter);
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
 
-    setTransactions(demoTransactions);
-    setLoading(false);
-  }, [router]);
+    (async () => {
+      try {
+        const res = await fetch(`/api/transactions?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          router.push('/login');
+          return;
+        }
+        const data = await res.json();
+        setTransactions(data.transactions ?? []);
+      } catch {
+        setTransactions([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [router, selectedCategory, classificationFilter, startDate, endDate]);
 
-  useEffect(() => {
-    let filtered = transactions;
-
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter((t) => t.category === selectedCategory);
-    }
-
-    if (classificationFilter !== 'all') {
-      filtered = filtered.filter(
-        (t) => t.classification === classificationFilter
-      );
-    }
-
-    if (searchQuery) {
-      filtered = filtered.filter((t) =>
+  // Merchant search is applied client-side for instant feedback; category,
+  // classification, and date filters are handled server-side by the API.
+  const filteredTransactions = searchQuery
+    ? transactions.filter((t) =>
         t.merchant.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    setFilteredTransactions(filtered);
-  }, [transactions, selectedCategory, classificationFilter, searchQuery]);
+      )
+    : transactions;
 
   if (loading) {
     return (
@@ -146,7 +105,7 @@ export default function Transactions() {
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Search */}
           <div className="relative">
             <input
@@ -186,6 +145,25 @@ export default function Transactions() {
             <option value="must_have">🏠 Must-Have</option>
             <option value="luxury">✨ Luxury</option>
           </select>
+
+          {/* Date Range Filter */}
+          <div className="flex items-center gap-2 px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white [color-scheme:dark]">
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              aria-label="From date"
+              className="flex-1 min-w-0 bg-transparent text-sm text-white focus:outline-none"
+            />
+            <span className="text-slate-500">→</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              aria-label="To date"
+              className="flex-1 min-w-0 bg-transparent text-sm text-white focus:outline-none"
+            />
+          </div>
         </div>
 
         {/* Transactions Table */}
