@@ -255,7 +255,7 @@ export default function Dashboard() {
             onClick={() => router.push('/upload')}
             className="px-8 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white rounded-lg font-bold text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl active:scale-95"
           >
-            📤 {t('dashboard.uploadNew')}
+            <span dir="ltr">📤 {t('dashboard.uploadNew')}</span>
           </button>
         </div>
       </div>

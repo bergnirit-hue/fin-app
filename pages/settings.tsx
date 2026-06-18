@@ -123,7 +123,7 @@ export default function Settings() {
                 </div>
 
                 <button className="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 mt-6">
-                  💾 {t('settings.saveChanges')}
+                  <span dir="ltr">💾 {t('settings.saveChanges')}</span>
                 </button>
               </div>
             )}
@@ -155,7 +155,7 @@ export default function Settings() {
                       type="submit"
                       className="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
                     >
-                      📨 {t('settings.sendInvite')}
+                      <span dir="ltr">📨 {t('settings.sendInvite')}</span>
                     </button>
                   </form>
                 </div>
@@ -210,7 +210,7 @@ export default function Settings() {
                 </div>
 
                 <button className="w-full px-6 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 mt-4">
-                  ➕ {t('settings.addRule')}
+                  <span dir="ltr">➕ {t('settings.addRule')}</span>
                 </button>
               </div>
             )}
@@ -272,7 +272,7 @@ export default function Settings() {
                 </div>
 
                 <button className="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 mt-6">
-                  💾 {t('settings.savePrefs')}
+                  <span dir="ltr">💾 {t('settings.savePrefs')}</span>
                 </button>
               </div>
             )}
