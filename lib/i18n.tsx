@@ -137,6 +137,8 @@ const en: Dict = {
     categoryType: 'Category Type',
     save: 'Save',
     cancel: 'Cancel',
+    detailMissing: 'Detail missing',
+    charges: 'charges',
   },
   settings: {
     title: 'Settings',
@@ -333,6 +335,8 @@ const he: Dict = {
     categoryType: 'סוג הקטגוריה',
     save: 'שמור',
     cancel: 'ביטול',
+    detailMissing: 'פירוט חסר',
+    charges: 'חיובים',
   },
   settings: {
     title: 'הגדרות',

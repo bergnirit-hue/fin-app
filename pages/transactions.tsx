@@ -11,6 +11,8 @@ interface Transaction {
   category: string;
   classification: string;
   sourceType: string;
+  details?: Transaction[];
+  detailMissing?: boolean;
 }
 
 export default function Transactions() {
@@ -30,6 +32,7 @@ export default function Transactions() {
   const [addForTxId, setAddForTxId] = useState<string | null>(null);
   const [newCatName, setNewCatName] = useState('');
   const [newCatType, setNewCatType] = useState<'must_have' | 'luxury'>('must_have');
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   // Load categories from API (built-in + custom)
   useEffect(() => {
@@ -155,6 +158,15 @@ export default function Transactions() {
       }
     })();
   }, [router, selectedCategory, classificationFilter, startDate, endDate]);
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Merchant search is applied client-side for instant feedback; category,
   // classification, and date filters are handled server-side by the API.
@@ -291,68 +303,139 @@ export default function Transactions() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
-                  {filteredTransactions.map((tx) => (
-                    <tr
-                      key={tx.id}
-                      className="hover:bg-slate-600/30 transition-colors"
-                    >
-                      <td className="px-6 py-4 text-slate-300">
-                        {formatDate(tx.date)}
-                      </td>
-                      <td className="px-6 py-4 text-slate-100 font-semibold">
-                        {tx.merchant}
-                      </td>
-                      <td className={`px-6 py-4 text-end font-bold ${tx.amount >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        <span dir="ltr">{tx.amount >= 0 ? '+' : '−'}{formatMoney(Math.abs(tx.amount))}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        {editingId === tx.id ? (
-                          <select
-                            autoFocus
-                            value={tx.category}
-                            onChange={(e) =>
-                              handleCategorize(tx.id, e.target.value)
-                            }
-                            onBlur={() => setTimeout(() => setEditingId(null), 150)}
-                            className="px-3 py-2 bg-slate-700 border border-emerald-500/50 rounded-lg text-emerald-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
-                          >
-                            {categoryNames.filter((c) => c !== 'Other').map((c) => (
-                              <option key={c} value={c}>
-                                {t(`categories.${c}`) !== `categories.${c}` ? t(`categories.${c}`) : c}
-                              </option>
-                            ))}
-                            <option value="Other">{t('categories.Other')}</option>
-                            <option value="__add__">➕ {t('transactions.addCategory')}</option>
-                          </select>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(tx.id)}
-                            title={t('transactions.reCategorize')}
-                            className="px-4 py-2 bg-emerald-600/30 text-emerald-200 text-xs font-semibold rounded-full hover:bg-emerald-600/50 transition-colors cursor-pointer"
-                          >
-                            {t(`categories.${tx.category}`) !== `categories.${tx.category}` ? t(`categories.${tx.category}`) : tx.category} ✎
-                          </button>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`px-4 py-2 text-xs font-semibold rounded-full ${
-                            tx.classification === 'must_have'
-                              ? 'bg-cyan-600/30 text-cyan-200'
-                              : 'bg-violet-600/30 text-violet-200'
-                          }`}
+                  {filteredTransactions.map((tx) => {
+                    const expandable = !!(tx.details && tx.details.length > 0);
+                    const isExpanded = expandedIds.has(tx.id);
+
+                    return (
+                      <TransactionRows key={tx.id}>
+                        {/* ── Main row ── */}
+                        <tr
+                          className={`hover:bg-slate-600/30 transition-colors ${
+                            expandable || tx.detailMissing
+                              ? 'cursor-pointer'
+                              : ''
+                          } ${isExpanded ? 'bg-slate-600/20' : ''}`}
+                          onClick={
+                            expandable
+                              ? () => toggleExpand(tx.id)
+                              : undefined
+                          }
                         >
-                          {tx.classification === 'must_have'
-                            ? `🏠 ${t('transactions.mustHave')}`
-                            : `✨ ${t('transactions.luxury')}`}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-400 text-sm font-medium">
-                        {sourceLabel(tx.sourceType)}
-                      </td>
-                    </tr>
-                  ))}
+                          <td className="px-6 py-4 text-slate-300">
+                            {formatDate(tx.date)}
+                          </td>
+                          <td className="px-6 py-4 text-slate-100 font-semibold">
+                            <div className="flex items-center gap-2">
+                              {expandable && (
+                                <span
+                                  className={`text-xs text-slate-400 transition-transform inline-block ${
+                                    isExpanded ? 'rotate-90' : ''
+                                  }`}
+                                >
+                                  ▶
+                                </span>
+                              )}
+                              <span>{tx.merchant}</span>
+                              {tx.detailMissing && (
+                                <span className="px-2 py-0.5 bg-amber-600/30 text-amber-300 text-[10px] font-bold rounded-full whitespace-nowrap">
+                                  {t('transactions.detailMissing')}
+                                </span>
+                              )}
+                              {expandable && (
+                                <span className="px-2 py-0.5 bg-cyan-600/20 text-cyan-300 text-[10px] font-bold rounded-full whitespace-nowrap">
+                                  💳 {tx.details!.length} {t('transactions.charges')}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className={`px-6 py-4 text-end font-bold ${tx.amount >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            <span dir="ltr">{tx.amount >= 0 ? '+' : '−'}{formatMoney(Math.abs(tx.amount))}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            {editingId === tx.id ? (
+                              <select
+                                autoFocus
+                                value={tx.category}
+                                onChange={(e) =>
+                                  handleCategorize(tx.id, e.target.value)
+                                }
+                                onBlur={() => setTimeout(() => setEditingId(null), 150)}
+                                className="px-3 py-2 bg-slate-700 border border-emerald-500/50 rounded-lg text-emerald-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                              >
+                                {categoryNames.filter((c) => c !== 'Other').map((c) => (
+                                  <option key={c} value={c}>
+                                    {t(`categories.${c}`) !== `categories.${c}` ? t(`categories.${c}`) : c}
+                                  </option>
+                                ))}
+                                <option value="Other">{t('categories.Other')}</option>
+                                <option value="__add__">➕ {t('transactions.addCategory')}</option>
+                              </select>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setEditingId(tx.id); }}
+                                title={t('transactions.reCategorize')}
+                                className="px-4 py-2 bg-emerald-600/30 text-emerald-200 text-xs font-semibold rounded-full hover:bg-emerald-600/50 transition-colors cursor-pointer"
+                              >
+                                {t(`categories.${tx.category}`) !== `categories.${tx.category}` ? t(`categories.${tx.category}`) : tx.category} ✎
+                              </button>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`px-4 py-2 text-xs font-semibold rounded-full ${
+                                tx.classification === 'must_have'
+                                  ? 'bg-cyan-600/30 text-cyan-200'
+                                  : 'bg-violet-600/30 text-violet-200'
+                              }`}
+                            >
+                              {tx.classification === 'must_have'
+                                ? `🏠 ${t('transactions.mustHave')}`
+                                : `✨ ${t('transactions.luxury')}`}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-slate-400 text-sm font-medium">
+                            {sourceLabel(tx.sourceType)}
+                          </td>
+                        </tr>
+
+                        {/* ── Expanded CC detail rows ── */}
+                        {isExpanded &&
+                          tx.details!.map((d, idx) => (
+                            <tr
+                              key={d.id}
+                              className="bg-slate-800/60 border-s-4 border-cyan-500/40"
+                            >
+                              <td className="px-6 py-3 text-slate-400 text-sm">
+                                {formatDate(d.date)}
+                              </td>
+                              <td className="px-6 py-3 text-slate-300 text-sm ps-10">
+                                ↳ {d.merchant}
+                              </td>
+                              <td className="px-6 py-3 text-end text-sm font-semibold text-rose-300">
+                                <span dir="ltr">−{formatMoney(Math.abs(d.amount))}</span>
+                              </td>
+                              <td className="px-6 py-3">
+                                <span className="px-3 py-1 bg-emerald-600/20 text-emerald-300 text-[10px] font-semibold rounded-full">
+                                  {t(`categories.${d.category}`) !== `categories.${d.category}` ? t(`categories.${d.category}`) : d.category}
+                                </span>
+                              </td>
+                              <td className="px-6 py-3">
+                                <span className="text-xs text-slate-500">
+                                  {d.classification === 'must_have'
+                                    ? `🏠 ${t('transactions.mustHave')}`
+                                    : `✨ ${t('transactions.luxury')}`}
+                                </span>
+                              </td>
+                              <td className="px-6 py-3 text-slate-500 text-xs">
+                                💳
+                              </td>
+                            </tr>
+                          ))}
+                      </TransactionRows>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -461,6 +544,11 @@ export default function Transactions() {
       )}
     </>
   );
+}
+
+/** Thin wrapper so we can return multiple `<tr>` elements from a `.map()`. */
+function TransactionRows({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }
 
 function StatCard({

@@ -8,6 +8,7 @@ import { TransactionParser, ColumnMapping } from '@/lib/core/parser';
 import { DeduplicationEngine } from '@/lib/core/deduplication';
 import { CategorizationEngine } from '@/lib/core/categorization';
 import { ClassificationEngine } from '@/lib/core/classification';
+import { findMatchingBankEntry } from '@/lib/core/reconciliation';
 
 interface UploadResponse {
   success: boolean;
@@ -206,6 +207,45 @@ export default async function handler(
           sourceType: tx.sourceType,
         })),
       });
+    }
+
+    // ── Credit-card ↔ bank reconciliation ──────────────────────────
+    // When a credit-card detail file is uploaded, try to match it to an
+    // existing bank-statement lump-sum (e.g. "ישראכרט −₪5 000").  If
+    // found, link the CC details to that bank row so they show as an
+    // expandable drill-down and are excluded from summary totals.
+    let linkedParentId: string | null = null;
+    if (sourceType === 'credit_card' && toInsert.length > 0) {
+      const ccTotal = toInsert.reduce(
+        (sum, tx) => sum + Math.abs(tx.amount),
+        0
+      );
+      const ccLatestDate = toInsert.reduce(
+        (latest, tx) => (tx.date > latest ? tx.date : latest),
+        toInsert[0].date
+      );
+
+      // Fetch unlinked negative bank transactions for this user.
+      const bankCandidates = await prisma.transaction.findMany({
+        where: {
+          userId: auth.userId,
+          sourceType: 'bank',
+          linkedToId: null,
+          amount: { lt: 0 },
+        },
+      });
+
+      const match = findMatchingBankEntry(bankCandidates, ccTotal, ccLatestDate);
+      if (match) {
+        await prisma.transaction.updateMany({
+          where: { uploadId: upload.id },
+          data: { linkedToId: match.id },
+        });
+        linkedParentId = match.id;
+        console.log(
+          `Upload: linked ${toInsert.length} CC details to bank entry "${match.merchant}" (${match.id})`
+        );
+      }
     }
 
     return res.status(200).json({
