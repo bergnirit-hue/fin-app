@@ -6,7 +6,7 @@ import { useI18n } from '@/lib/i18n';
 export default function Upload() {
   const router = useRouter();
   const { t, formatMoney, formatDate } = useI18n();
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [sourceType, setSourceType] = useState('bank');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -15,12 +15,29 @@ export default function Upload() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
 
+  const addFiles = (newFiles: FileList | File[]) => {
+    const incoming = Array.from(newFiles).filter(
+      (f) =>
+        f.name.endsWith('.csv') ||
+        f.name.endsWith('.xlsx') ||
+        f.name.endsWith('.xls')
+    );
+    if (incoming.length === 0) return;
+    setFiles((prev) => {
+      const names = new Set(prev.map((f) => f.name));
+      return [...prev, ...incoming.filter((f) => !names.has(f.name))];
+    });
+    setError('');
+    setSuccess('');
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      setError('');
-      setSuccess('');
+    if (e.target.files && e.target.files.length > 0) {
+      addFiles(e.target.files);
     }
   };
 
@@ -39,55 +56,77 @@ export default function Upload() {
     e.stopPropagation();
     setDragActive(false);
 
-    const droppedFile = e.dataTransfer.files?.[0];
-    if (droppedFile) {
-      setFile(droppedFile);
-      setError('');
-      setSuccess('');
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) {
+    if (files.length === 0) {
       setError(t('upload.errorSelect'));
       return;
     }
 
     setLoading(true);
     setError('');
+    setPreview([]);
+
+    let totalSaved = 0;
+    let totalDuplicates = 0;
+    let allPreview: any[] = [];
+    const errors: string[] = [];
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('sourceType', sourceType);
+      const token = localStorage.getItem('token');
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: formData,
-      });
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('sourceType', sourceType);
 
-      const data = await response.json();
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
 
-      if (!response.ok) {
-        setError(data.message || t('upload.errorUpload'));
+        const data = await response.json();
+
+        if (!response.ok) {
+          errors.push(`${file.name}: ${data.message || t('upload.errorUpload')}`);
+          continue;
+        }
+
+        totalSaved += data.savedCount ?? data.transactionCount ?? 0;
+        totalDuplicates += data.duplicateCount ?? 0;
+
+        if (data.transactions) {
+          allPreview = allPreview.concat(data.transactions);
+        }
+      }
+
+      if (allPreview.length > 0) {
+        setPreview(allPreview.slice(0, 5));
+      }
+
+      if (errors.length > 0 && errors.length === files.length) {
+        setError(errors.join('\n'));
         setLoading(false);
         return;
       }
 
-      if (data.transactions && data.transactions.length > 0) {
-        setPreview(data.transactions.slice(0, 5));
+      if (errors.length > 0) {
+        setError(errors.join('\n'));
       }
 
       setSuccess(
-        t('upload.success', {
-          count: data.savedCount ?? data.transactionCount ?? 0,
+        t('upload.successMulti', {
+          count: totalSaved,
+          files: files.length - errors.length,
         })
       );
-      setFile(null);
+      setFiles([]);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -165,7 +204,7 @@ export default function Upload() {
               className={`border-3 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 transform ${
                 dragActive
                   ? 'border-emerald-400 bg-emerald-600/20 scale-105'
-                  : file
+                  : files.length > 0
                   ? 'border-cyan-400 bg-cyan-600/10'
                   : 'border-slate-600 bg-slate-800/30 hover:border-violet-400 hover:bg-violet-600/10'
               }`}
@@ -174,21 +213,49 @@ export default function Upload() {
                 ref={fileInputRef}
                 type="file"
                 accept=".csv,.xlsx,.xls"
+                multiple
                 onChange={handleFileChange}
                 className="hidden"
               />
               <div className="space-y-3">
                 <p className={`text-5xl transition-transform ${dragActive ? 'scale-125' : ''}`}>
-                  {file ? '✅' : '📤'}
+                  {files.length > 0 ? '✅' : '📤'}
                 </p>
                 <p className="text-slate-200 font-bold text-lg">
-                  {file
-                    ? t('upload.selected', { name: file.name })
+                  {files.length > 0
+                    ? t('upload.filesSelected', { count: files.length })
                     : t('upload.dragDrop')}
                 </p>
                 <p className="text-slate-400 text-sm">{t('upload.orClick')}</p>
               </div>
             </div>
+
+            {/* Selected file list */}
+            {files.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {files.map((f, idx) => (
+                  <div
+                    key={f.name}
+                    className="flex items-center justify-between bg-slate-700/40 rounded-lg px-4 py-2"
+                  >
+                    <span className="text-slate-200 text-sm truncate">
+                      📄 {f.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFile(idx);
+                      }}
+                      className="text-slate-400 hover:text-rose-400 transition-colors ms-3 shrink-0"
+                      aria-label={t('upload.removeFile')}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Messages */}
@@ -254,7 +321,7 @@ export default function Upload() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={!file || loading}
+            disabled={files.length === 0 || loading}
             className="w-full px-8 py-4 bg-gradient-to-r from-emerald-500 via-cyan-500 to-violet-500 hover:from-emerald-600 hover:via-cyan-600 hover:to-violet-600 text-white rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 shadow-lg hover:shadow-2xl"
           >
             {loading ? (
