@@ -94,14 +94,15 @@ export default async function handler(
       );
     } else if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
       // Use the provided mapping, or auto-detect from the Excel headers.
+      // Israeli bank exports often have title/summary rows above the real
+      // data table, so readExcelSheet scans for the header row automatically.
       let mapping = columnMapping;
       if (!mapping) {
         const workbook = XLSX.read(buffer, { type: 'buffer' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet);
-        mapping = TransactionParser.detectColumns(rows as any[]);
+        const result = TransactionParser.readExcelSheet(workbook);
+        mapping = result.mapping;
         if (!mapping) {
-          console.error('Upload: column detection failed. Headers:', rows[0] ? Object.keys(rows[0] as any) : 'no rows');
+          console.error('Upload: column detection failed. Headers:', result.data[0] ? Object.keys(result.data[0] as any) : 'no rows');
           return res.status(400).json({
             success: false,
             message:

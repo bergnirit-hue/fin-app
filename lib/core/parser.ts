@@ -35,13 +35,47 @@ export class TransactionParser {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(sheet);
+    // Israeli bank Excel exports often have title/summary rows above the
+    // actual data table.  Use the same header-row scan that detectColumns
+    // relies on so parseExcel honours the discovered `range` offset.
+    const { data } = this.readExcelSheet(workbook);
 
     const transactions = data
       .map((row: any) => this.mapRow(row, mapping, sourceType))
       .filter((t): t is ParsedTransaction => t !== null);
 
     return { transactions, columnMapping: mapping };
+  }
+
+  // Scan the first sheet of an Excel workbook trying successive rows as the
+  // header row (rows 0–9).  Israeli bank exports commonly have a title row
+  // like "תנועות בחשבון" above the real column headers.  Returns the parsed
+  // rows keyed by the detected headers, plus the column mapping.
+  static readExcelSheet(workbook: XLSX.WorkBook): {
+    data: any[];
+    mapping: ColumnMapping | null;
+  } {
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+
+    // Try up to 10 header-row offsets (covers title rows, blank rows, etc.)
+    for (let skip = 0; skip <= Math.min(9, range.e.r); skip++) {
+      const data = XLSX.utils.sheet_to_json(sheet, { range: skip });
+      if (!data || data.length === 0) continue;
+
+      const mapping = this.detectColumns(data as any[]);
+      if (mapping) {
+        return { data: data as any[], mapping };
+      }
+    }
+
+    // Fallback: return the default (row 0 as header) so callers can still
+    // inspect what was found — even though detection failed.
+    return {
+      data: XLSX.utils.sheet_to_json(sheet) as any[],
+      mapping: null,
+    };
   }
 
   static async parseCSV(
