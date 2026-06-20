@@ -68,18 +68,20 @@ export default async function handler(
       : null;
 
     let parseResult;
+    const ext = filename.toLowerCase();
 
-    if (filename.endsWith('.csv')) {
+    if (ext.endsWith('.csv')) {
       // Use the provided mapping, or auto-detect from the CSV headers.
       let mapping = columnMapping;
       if (!mapping) {
         const rows = await TransactionParser.readRawRows(buffer);
         mapping = TransactionParser.detectColumns(rows);
         if (!mapping) {
-          return res.status(200).json({
-            success: true,
+          console.error('Upload: column detection failed. Headers:', rows[0] ? Object.keys(rows[0]) : 'no rows');
+          return res.status(400).json({
+            success: false,
             message:
-              'Could not auto-detect columns. Please map columns manually.',
+              'Could not auto-detect columns. Please check the file format.',
             transactions: [],
           });
         }
@@ -90,7 +92,7 @@ export default async function handler(
         mapping,
         sourceType
       );
-    } else if (filename.endsWith('.xlsx') || filename.endsWith('.xls')) {
+    } else if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
       // Use the provided mapping, or auto-detect from the Excel headers.
       let mapping = columnMapping;
       if (!mapping) {
@@ -99,10 +101,11 @@ export default async function handler(
         const rows = XLSX.utils.sheet_to_json(sheet);
         mapping = TransactionParser.detectColumns(rows as any[]);
         if (!mapping) {
-          return res.status(200).json({
-            success: true,
+          console.error('Upload: column detection failed. Headers:', rows[0] ? Object.keys(rows[0] as any) : 'no rows');
+          return res.status(400).json({
+            success: false,
             message:
-              'Could not auto-detect columns. Please confirm column mapping.',
+              'Could not auto-detect columns. Please check the file format.',
             transactions: [],
           });
         }
@@ -118,6 +121,11 @@ export default async function handler(
         success: false,
         message: 'Unsupported file format. Use CSV or Excel.',
       });
+    }
+
+    console.log(`Upload: parsed ${parseResult.transactions.length} rows from "${filename}"`);
+    if (parseResult.transactions.length === 0) {
+      console.error('Upload: 0 rows parsed. Mapping used:', parseResult.columnMapping);
     }
 
     // Deduplicate within the uploaded file (+ payment-service mapping)

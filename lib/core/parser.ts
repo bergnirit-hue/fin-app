@@ -58,10 +58,10 @@ export class TransactionParser {
   }
 
   // Read CSV/TSV rows as header-keyed objects, auto-detecting the delimiter
-  // (comma, tab, or semicolon — Israeli bank exports often use tab/semicolon
-  // because amounts contain commas as thousands separators).
+  // and encoding (UTF-8 or Windows-1255, common in Israeli bank exports).
   static readRawRows(buffer: Buffer): Promise<any[]> {
-    const separator = this.detectDelimiter(buffer);
+    const normalized = this.normalizeEncoding(buffer);
+    const separator = this.detectDelimiter(normalized);
     // Standard comma CSV uses '"' for quoting. Tab/semicolon files are
     // typically bank exports where '"' is literal text — notably the Hebrew
     // gershayim in abbreviations like בע"מ or רשל"צ — so disable quote
@@ -73,12 +73,61 @@ export class TransactionParser {
 
     return new Promise((resolve, reject) => {
       const rows: any[] = [];
-      Readable.from([buffer])
+      Readable.from([normalized])
         .pipe(csvParser(options))
         .on('data', (row: any) => rows.push(row))
         .on('end', () => resolve(rows))
         .on('error', reject);
     });
+  }
+
+  // Israeli bank exports are often Windows-1255 encoded. Detect and convert
+  // to UTF-8 so Hebrew column headers and values match our regex patterns.
+  private static normalizeEncoding(buffer: Buffer): Buffer {
+    if (buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
+      return buffer.subarray(3);
+    }
+
+    const sample = buffer.subarray(0, Math.min(500, buffer.length));
+    let hasHighBytes = false;
+    let validUtf8 = true;
+
+    for (let i = 0; i < sample.length; i++) {
+      const b = sample[i];
+      if (b <= 0x7F) continue;
+      hasHighBytes = true;
+      if (b >= 0xC0 && b <= 0xDF) {
+        if (i + 1 >= sample.length || (sample[i + 1] & 0xC0) !== 0x80) {
+          validUtf8 = false;
+          break;
+        }
+        i++;
+      } else if (b >= 0xE0 && b <= 0xEF) {
+        if (
+          i + 2 >= sample.length ||
+          (sample[i + 1] & 0xC0) !== 0x80 ||
+          (sample[i + 2] & 0xC0) !== 0x80
+        ) {
+          validUtf8 = false;
+          break;
+        }
+        i += 2;
+      } else if (b >= 0x80 && b < 0xC0) {
+        validUtf8 = false;
+        break;
+      }
+    }
+
+    if (hasHighBytes && !validUtf8) {
+      try {
+        const decoded = new TextDecoder('windows-1255').decode(buffer);
+        return Buffer.from(decoded, 'utf8');
+      } catch {
+        return buffer;
+      }
+    }
+
+    return buffer;
   }
 
   private static detectDelimiter(buffer: Buffer): string {
@@ -140,7 +189,12 @@ export class TransactionParser {
     if (!data || data.length === 0) return null;
 
     const headers = Object.keys(data[0]);
-    const find = (re: RegExp) => headers.find((h) => re.test(h));
+    const used = new Set<string>();
+    const find = (re: RegExp) => {
+      const h = headers.find((h) => !used.has(h) && re.test(h));
+      if (h) used.add(h);
+      return h;
+    };
 
     const dateColumn = find(/date|תאריך/i);
     const merchantColumn = find(
