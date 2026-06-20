@@ -423,8 +423,8 @@ export default function Transactions() {
                               <td className="px-6 py-3 text-slate-300 text-sm ps-10">
                                 ↳ {d.merchant}
                               </td>
-                              <td className="px-6 py-3 text-end text-sm font-semibold text-rose-300">
-                                <span dir="ltr">−{formatMoney(Math.abs(d.amount))}</span>
+                              <td className={`px-6 py-3 text-end text-sm font-semibold ${d.amount >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                                <span dir="ltr">{d.amount >= 0 ? '+' : '−'}{formatMoney(Math.abs(d.amount))}</span>
                               </td>
                               <td className="px-6 py-3">
                                 <span className="px-3 py-1 bg-emerald-600/20 text-emerald-300 text-[10px] font-semibold rounded-full">
