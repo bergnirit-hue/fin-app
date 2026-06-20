@@ -339,7 +339,12 @@ export class TransactionParser {
     );
     const debitColumn = find(/^debit$|חובה/i);
     const creditColumn = find(/^credit$|זכות/i);
-    const amountColumn = find(/amount|סכום|transaction amount/i);
+    // Prefer "סכום חיוב" (charge amount — the actual monthly billing) over
+    // "סכום עסקה" (transaction amount — the full purchase price, which can
+    // differ for installment payments or discounted fees).  Fall back to the
+    // generic "סכום" / "amount" pattern for bank statements and other files.
+    const amountColumn =
+      find(/סכום.?חיוב/i) || find(/amount|סכום|transaction amount/i);
     const descriptionColumn = find(/description|notes|memo|פרטים|הערות/i);
 
     if (
