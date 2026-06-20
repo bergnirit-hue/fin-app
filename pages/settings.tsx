@@ -27,6 +27,9 @@ export default function Settings() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [rules, setRules] = useState<RuleItem[]>([]);
+  const [showAddRuleModal, setShowAddRuleModal] = useState(false);
+  const [newRuleMerchant, setNewRuleMerchant] = useState('');
+  const [newRuleCategory, setNewRuleCategory] = useState('');
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -104,6 +107,31 @@ export default function Settings() {
         setRules((prev) => prev.filter((r) => r.id !== id));
       }
     } catch {}
+  };
+
+  const handleAddRule = async () => {
+    const merchant = newRuleMerchant.trim();
+    const category = newRuleCategory.trim();
+    if (!merchant || !category) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/rules', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ merchantPattern: merchant, targetCategory: category }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRules((prev) => [data.rule, ...prev]);
+      }
+    } catch {}
+    setShowAddRuleModal(false);
+    setNewRuleMerchant('');
+    setNewRuleCategory('');
   };
 
   const handleInviteSpouse = async (e: React.FormEvent) => {
@@ -360,6 +388,85 @@ export default function Settings() {
                       );
                     })
                   )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (categories.length === 0) loadCategories();
+                    setShowAddRuleModal(true);
+                  }}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 mt-4"
+                >
+                  <span dir="ltr">➕ {t('settings.addRule')}</span>
+                </button>
+              </div>
+            )}
+
+            {/* Add Rule Modal */}
+            {showAddRuleModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                <div className="bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-600/50 rounded-2xl p-8 shadow-2xl w-full max-w-md mx-4">
+                  <h3 className="text-2xl font-bold text-white mb-6">
+                    {t('settings.addRuleTitle')}
+                  </h3>
+
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-300 mb-2">
+                        {t('settings.merchantName')}
+                      </label>
+                      <input
+                        type="text"
+                        autoFocus
+                        value={newRuleMerchant}
+                        onChange={(e) => setNewRuleMerchant(e.target.value)}
+                        placeholder={t('settings.merchantName')}
+                        className="w-full px-5 py-3 bg-slate-600/50 border border-slate-500/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-300 mb-2">
+                        {t('settings.targetCategory')}
+                      </label>
+                      <select
+                        value={newRuleCategory}
+                        onChange={(e) => setNewRuleCategory(e.target.value)}
+                        className="w-full px-5 py-3 bg-slate-600/50 border border-slate-500/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition [color-scheme:dark]"
+                      >
+                        <option value="">{t('settings.selectCategory')}</option>
+                        {categories.filter((c) => c.name !== 'Other').map((c) => {
+                          const label = t(`categories.${c.name}`) !== `categories.${c.name}`
+                            ? t(`categories.${c.name}`)
+                            : c.name;
+                          return (
+                            <option key={c.name} value={c.name}>{label}</option>
+                          );
+                        })}
+                        <option value="Other">{t('categories.Other')}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-8">
+                    <button
+                      onClick={handleAddRule}
+                      disabled={!newRuleMerchant.trim() || !newRuleCategory}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all transform hover:scale-105"
+                    >
+                      <span dir="ltr">💾 {t('settings.saveRule')}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowAddRuleModal(false);
+                        setNewRuleMerchant('');
+                        setNewRuleCategory('');
+                      }}
+                      className="flex-1 px-6 py-3 bg-slate-600/50 hover:bg-slate-500/50 text-slate-300 rounded-xl font-semibold transition-all"
+                    >
+                      {t('settings.cancelRule')}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
