@@ -150,6 +150,46 @@ export default async function handler(
       console.error('Upload: 0 rows parsed. Mapping used:', parseResult.columnMapping);
     }
 
+    // ── Same-file overwrite ──────────────────────────────────────
+    // When the same filename is uploaded again by the same user, treat it
+    // as a replacement: delete the old upload's transactions so the new
+    // data takes their place (avoids duplicates when re-importing after a
+    // column-mapping change, for example).
+    const previousUploads = await prisma.upload.findMany({
+      where: { userId: auth.userId, fileName: filename },
+    });
+    if (previousUploads.length > 0) {
+      const prevIds = previousUploads.map((u) => u.id);
+
+      // If old CC details were linked to bank entries, clear the card
+      // label from those parent entries so reconciliation can re-set it.
+      const oldLinked = await prisma.transaction.findMany({
+        where: { uploadId: { in: prevIds }, linkedToId: { not: null } },
+        select: { linkedToId: true },
+        distinct: ['linkedToId'],
+      });
+      const parentIds = oldLinked
+        .map((t) => t.linkedToId!)
+        .filter(Boolean);
+      if (parentIds.length > 0) {
+        await prisma.transaction.updateMany({
+          where: { id: { in: parentIds } },
+          data: { description: null },
+        });
+      }
+
+      await prisma.transaction.deleteMany({
+        where: { uploadId: { in: prevIds } },
+      });
+      await prisma.upload.deleteMany({
+        where: { id: { in: prevIds } },
+      });
+
+      console.log(
+        `Upload: replaced ${previousUploads.length} previous upload(s) of "${filename}"`
+      );
+    }
+
     // Deduplicate within the uploaded file (+ payment-service mapping)
     const dedupResult = DeduplicationEngine.deduplicateAndMap(
       parseResult.transactions
