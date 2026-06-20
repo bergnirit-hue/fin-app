@@ -8,7 +8,7 @@ import { TransactionParser, ColumnMapping } from '@/lib/core/parser';
 import { DeduplicationEngine } from '@/lib/core/deduplication';
 import { CategorizationEngine } from '@/lib/core/categorization';
 import { ClassificationEngine } from '@/lib/core/classification';
-import { findMatchingBankEntry } from '@/lib/core/reconciliation';
+import { findMatchingBankEntry, looksLikeCreditCardFile } from '@/lib/core/reconciliation';
 
 interface UploadResponse {
   success: boolean;
@@ -63,12 +63,13 @@ export default async function handler(
 
     const buffer = fs.readFileSync(uploadedFile.filepath);
     const filename = uploadedFile.originalFilename || 'unknown';
-    const sourceType = (fields.sourceType?.[0] || 'bank').toLowerCase();
+    let sourceType = (fields.sourceType?.[0] || 'bank').toLowerCase();
     const columnMapping: ColumnMapping | null = fields.columnMapping
       ? JSON.parse(fields.columnMapping[0])
       : null;
 
     let parseResult;
+    let fileHeaders: string[] = [];
     const ext = filename.toLowerCase();
 
     if (ext.endsWith('.csv')) {
@@ -76,9 +77,10 @@ export default async function handler(
       let mapping = columnMapping;
       if (!mapping) {
         const rows = await TransactionParser.readRawRows(buffer);
+        fileHeaders = rows[0] ? Object.keys(rows[0]) : [];
         mapping = TransactionParser.detectColumns(rows);
         if (!mapping) {
-          console.error('Upload: column detection failed. Headers:', rows[0] ? Object.keys(rows[0]) : 'no rows');
+          console.error('Upload: column detection failed. Headers:', fileHeaders);
           return res.status(400).json({
             success: false,
             message:
@@ -86,6 +88,13 @@ export default async function handler(
             transactions: [],
           });
         }
+      }
+
+      // Auto-detect credit-card files based on column headers, even if the
+      // user selected "bank" as the source type.
+      if (sourceType !== 'credit_card' && looksLikeCreditCardFile(fileHeaders)) {
+        sourceType = 'credit_card';
+        console.log('Upload: auto-detected credit-card file from headers');
       }
 
       parseResult = await TransactionParser.parseCSV(
@@ -102,8 +111,9 @@ export default async function handler(
         const workbook = XLSX.read(buffer, { type: 'buffer' });
         const result = TransactionParser.readExcelSheet(workbook);
         mapping = result.mapping;
+        fileHeaders = result.data[0] ? Object.keys(result.data[0] as any) : [];
         if (!mapping) {
-          console.error('Upload: column detection failed. Headers:', result.data[0] ? Object.keys(result.data[0] as any) : 'no rows');
+          console.error('Upload: column detection failed. Headers:', fileHeaders);
           return res.status(400).json({
             success: false,
             message:
@@ -111,6 +121,12 @@ export default async function handler(
             transactions: [],
           });
         }
+      }
+
+      // Auto-detect credit-card files based on column headers.
+      if (sourceType !== 'credit_card' && looksLikeCreditCardFile(fileHeaders)) {
+        sourceType = 'credit_card';
+        console.log('Upload: auto-detected credit-card file from headers');
       }
 
       parseResult = await TransactionParser.parseExcel(
@@ -216,9 +232,11 @@ export default async function handler(
     // expandable drill-down and are excluded from summary totals.
     let linkedParentId: string | null = null;
     if (sourceType === 'credit_card' && toInsert.length > 0) {
-      const ccTotal = toInsert.reduce(
-        (sum, tx) => sum + Math.abs(tx.amount),
-        0
+      // Use the NET total (charges minus refunds) — this is what the bank
+      // deducts as a single lump sum.  Amounts are already negative for
+      // charges and positive for refunds after the credit-card negate step.
+      const ccTotal = Math.abs(
+        toInsert.reduce((sum, tx) => sum + tx.amount, 0)
       );
       const ccLatestDate = toInsert.reduce(
         (latest, tx) => (tx.date > latest ? tx.date : latest),

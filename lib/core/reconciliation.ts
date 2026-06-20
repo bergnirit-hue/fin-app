@@ -37,6 +37,30 @@ export function isCreditCardMerchant(merchant: string): boolean {
   return CC_COMPANY_PATTERNS.some((re) => re.test(merchant));
 }
 
+// Column-header patterns that are specific to Israeli credit-card exports
+// (Isracard, Cal, Max, Leumi Card, etc.) and NOT found in bank statements.
+const CC_HEADER_PATTERNS: RegExp[] = [
+  /סכום.?חיוב/,         // "סכום חיוב" — charge amount
+  /סכום.?עסקה/,         // "סכום עסקה" — transaction amount
+  /תאריך.?עסקה/,        // "תאריך עסקה" — transaction date
+  /בית.?עסק/,           // "שם בית עסק" — merchant name (CC-specific phrasing)
+  /ספרות.?אחרונות/,     // "4 ספרות אחרונות" — last 4 digits
+  /סוג.?עסקה/,          // "סוג עסקה" — transaction type
+  /מטבע.?עסקה/,         // "מטבע עסקה" — transaction currency
+  /מקור/,               // "מקור" — origin (Isracard)
+  /הערות/,              // can appear in both, but combined with others → CC
+];
+
+/**
+ * Check whether file column headers look like a credit-card statement.
+ * Matches when at least 2 CC-specific header patterns are found.
+ */
+export function looksLikeCreditCardFile(headers: string[]): boolean {
+  const joined = headers.join(' ');
+  const hits = CC_HEADER_PATTERNS.filter((re) => re.test(joined)).length;
+  return hits >= 2;
+}
+
 /**
  * Find the best-matching bank transaction for a set of credit-card charges.
  *
