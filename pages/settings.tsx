@@ -1,7 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { useI18n } from '@/lib/i18n';
+
+interface CategoryItem {
+  id?: string;
+  name: string;
+  classification: string;
+  isCustom: boolean;
+}
+
+interface RuleItem {
+  id: string;
+  merchantPattern: string;
+  targetCategory: string;
+  isActive: boolean;
+  createdAt: string;
+}
 
 export default function Settings() {
   const router = useRouter();
@@ -10,6 +25,8 @@ export default function Settings() {
   const [showHouseholdForm, setShowHouseholdForm] = useState(false);
   const [householdCode, setHouseholdCode] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [rules, setRules] = useState<RuleItem[]>([]);
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -27,6 +44,67 @@ export default function Settings() {
       console.error('Invalid token');
     }
   }, [router]);
+
+  const loadCategories = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/categories', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data.categories);
+      }
+    } catch {}
+  }, []);
+
+  const loadRules = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/rules', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRules(data.rules);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'categories') loadCategories();
+    if (activeTab === 'rules') loadRules();
+  }, [activeTab, loadCategories, loadRules]);
+
+  const handleDeleteCategory = async (id: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/categories/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setCategories((prev) => prev.filter((c) => c.id !== id));
+      }
+    } catch {}
+  };
+
+  const handleDeleteRule = async (id: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/rules/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setRules((prev) => prev.filter((r) => r.id !== id));
+      }
+    } catch {}
+  };
 
   const handleInviteSpouse = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +137,7 @@ export default function Settings() {
                   { id: 'general', label: t('settings.tabGeneral'), icon: '⚙️' },
                   { id: 'household', label: t('settings.tabHousehold'), icon: '👥' },
                   { id: 'categories', label: t('settings.tabCategories'), icon: '📂' },
+                  { id: 'rules', label: t('settings.tabRules'), icon: '🔗' },
                   { id: 'notifications', label: t('settings.tabNotifications'), icon: '🔔' },
                 ].map((tab) => (
                   <button
@@ -178,40 +257,110 @@ export default function Settings() {
               <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl p-8 space-y-6 shadow-lg">
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-                    <span>📂</span> {t('settings.categoryRules')}
+                    <span>📂</span> {t('settings.customCategories')}
                   </h2>
-                  <p className="text-slate-400">{t('settings.categoryRulesSub')}</p>
+                  <p className="text-slate-400">{t('settings.customCategoriesSub')}</p>
                 </div>
 
                 <div className="space-y-3 pt-4">
-                  {[
-                    { merchant: 'Starbucks', category: 'Dining', icon: '☕' },
-                    { merchant: 'Whole Foods', category: 'Groceries', icon: '🥬' },
-                    { merchant: 'Netflix', category: 'Subscriptions', icon: '🎬' },
-                  ].map((rule, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-xl border border-slate-600/50 transition-all group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{rule.icon}</span>
-                        <div>
-                          <p className="text-white font-semibold">{rule.merchant}</p>
-                          <p className="text-slate-400 text-sm">
-                            → {t(`categories.${rule.category}`)}
-                          </p>
-                        </div>
-                      </div>
-                      <button className="text-slate-400 hover:text-rose-400 transition opacity-0 group-hover:opacity-100 text-xl">
-                        ✕
-                      </button>
+                  {categories.length === 0 ? (
+                    <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600/50">
+                      <p className="text-slate-400 text-center py-6">
+                        📌 {t('settings.noCustomCategories')}
+                      </p>
                     </div>
-                  ))}
+                  ) : (
+                    categories.map((cat) => {
+                      const label = t(`categories.${cat.name}`) !== `categories.${cat.name}`
+                        ? t(`categories.${cat.name}`)
+                        : cat.name;
+                      return (
+                        <div
+                          key={cat.id || cat.name}
+                          className="flex items-center justify-between p-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-xl border border-slate-600/50 transition-all group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">
+                              {cat.classification === 'must_have' ? '🏠' : '✨'}
+                            </span>
+                            <div>
+                              <p className="text-white font-semibold">{label}</p>
+                              <p className="text-slate-400 text-sm">
+                                {cat.classification === 'must_have'
+                                  ? t('transactions.mustHave')
+                                  : t('transactions.luxury')}
+                                {' · '}
+                                <span className={`text-xs font-semibold ${cat.isCustom ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                  {cat.isCustom ? t('settings.customBadge') : t('settings.builtInBadge')}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+                          {cat.isCustom && cat.id && (
+                            <button
+                              onClick={() => handleDeleteCategory(cat.id!)}
+                              className="text-slate-400 hover:text-rose-400 transition opacity-0 group-hover:opacity-100 text-xl"
+                              title={t('settings.deleteCategory')}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Rules Settings */}
+            {activeTab === 'rules' && (
+              <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl p-8 space-y-6 shadow-lg">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                    <span>🔗</span> {t('settings.rulesTitle')}
+                  </h2>
+                  <p className="text-slate-400">{t('settings.rulesSub')}</p>
                 </div>
 
-                <button className="w-full px-6 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 mt-4">
-                  <span dir="ltr">➕ {t('settings.addRule')}</span>
-                </button>
+                <div className="space-y-3 pt-4">
+                  {rules.length === 0 ? (
+                    <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600/50">
+                      <p className="text-slate-400 text-center py-6">
+                        📌 {t('settings.noRules')}
+                      </p>
+                    </div>
+                  ) : (
+                    rules.map((rule) => {
+                      const catLabel = t(`categories.${rule.targetCategory}`) !== `categories.${rule.targetCategory}`
+                        ? t(`categories.${rule.targetCategory}`)
+                        : rule.targetCategory;
+                      return (
+                        <div
+                          key={rule.id}
+                          className="flex items-center justify-between p-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-xl border border-slate-600/50 transition-all group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">🏷️</span>
+                            <div>
+                              <p className="text-white font-semibold">{rule.merchantPattern}</p>
+                              <p className="text-slate-400 text-sm">
+                                → {catLabel}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteRule(rule.id)}
+                            className="text-slate-400 hover:text-rose-400 transition opacity-0 group-hover:opacity-100 text-xl"
+                            title={t('settings.deleteRule')}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
 

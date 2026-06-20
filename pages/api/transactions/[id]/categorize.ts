@@ -36,12 +36,43 @@ export default async function handler(
   }
 
   // Re-derive the must-have / luxury classification from the new category.
-  const classification = new ClassificationEngine().classify(category);
+  // Check user-defined classifications first, then fall back to defaults.
+  const userClassification = await prisma.classification.findFirst({
+    where: { userId: auth.userId, category },
+  });
+  const classification = userClassification
+    ? userClassification.type
+    : new ClassificationEngine().classify(category);
 
   const updated = await prisma.transaction.update({
     where: { id },
     data: { category, classification },
   });
+
+  // Auto-create a categorization rule: merchant → category.
+  // Uses the exact merchant name as the pattern so future uploads of the
+  // same merchant are categorized automatically.
+  const createRule = req.body?.createRule !== false; // default true
+  if (createRule && existing.merchant) {
+    const pattern = existing.merchant.trim();
+    const existingRule = await prisma.categorizationRule.findFirst({
+      where: { userId: auth.userId, merchantPattern: pattern },
+    });
+    if (existingRule) {
+      await prisma.categorizationRule.update({
+        where: { id: existingRule.id },
+        data: { targetCategory: category, isActive: true },
+      });
+    } else {
+      await prisma.categorizationRule.create({
+        data: {
+          userId: auth.userId,
+          merchantPattern: pattern,
+          targetCategory: category,
+        },
+      });
+    }
+  }
 
   const transaction: TransactionDTO = {
     id: updated.id,

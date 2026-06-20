@@ -25,45 +25,41 @@ export default function Transactions() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [allCategories, setAllCategories] = useState<Array<{ name: string; classification: string; isCustom: boolean }>>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForTxId, setAddForTxId] = useState<string | null>(null);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatType, setNewCatType] = useState<'must_have' | 'luxury'>('must_have');
 
-  const categories = [
-    'all',
-    'Groceries',
-    'Dining',
-    'Shopping',
-    'Transportation',
-    'Entertainment',
-    'Health',
-    'Utilities',
-    'Housing',
-    'Education',
-    'Other',
-  ];
+  // Load categories from API (built-in + custom)
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    (async () => {
+      try {
+        const res = await fetch('/api/categories', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAllCategories(data.categories);
+        }
+      } catch {}
+    })();
+  }, []);
 
-  // Full category set offered by the inline re-categorization editor —
-  // matches the keys the ClassificationEngine knows about so the
-  // must-have / luxury type is re-derived correctly on save.
-  const CATEGORY_OPTIONS = [
-    'Groceries',
-    'Dining',
-    'Shopping',
-    'Transportation',
-    'Travel',
-    'Entertainment',
-    'Subscriptions',
-    'Health',
-    'Utilities',
-    'Housing',
-    'Insurance',
-    'Education',
-    'Personal Care',
-    'Pets',
-    'Gifts',
-    'Office',
-    'Other',
-  ];
+  const categoryNames = allCategories.map((c) => c.name);
+  const filterCategories = ['all', ...categoryNames.filter((c) => c !== 'Other'), 'Other'].filter(
+    (v, i, a) => a.indexOf(v) === i
+  );
 
   const handleCategorize = async (id: string, category: string) => {
+    if (category === '__add__') {
+      setAddForTxId(id);
+      setShowAddModal(true);
+      return;
+    }
+
     setEditingId(null);
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -85,6 +81,45 @@ export default function Transactions() {
     } catch {
       // keep the existing value on failure
     }
+  };
+
+  const handleAddCategory = async () => {
+    const name = newCatName.trim();
+    if (!name) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      // 1. Create the category
+      const catRes = await fetch('/api/categories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name, classification: newCatType }),
+      });
+      if (!catRes.ok) return;
+      const catData = await catRes.json();
+
+      // Add to local state
+      setAllCategories((prev) => {
+        const filtered = prev.filter((c) => c.name !== name);
+        return [...filtered, catData.category].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+      });
+
+      // 2. If triggered from a transaction, re-categorize it
+      if (addForTxId) {
+        await handleCategorize(addForTxId, name);
+      }
+    } catch {}
+
+    setShowAddModal(false);
+    setAddForTxId(null);
+    setNewCatName('');
+    setNewCatType('must_have');
   };
 
   useEffect(() => {
@@ -179,11 +214,11 @@ export default function Transactions() {
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="px-5 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
           >
-            {categories.map((cat) => (
+            {filterCategories.map((cat) => (
               <option key={cat} value={cat}>
                 {cat === 'all'
                   ? `📊 ${t('transactions.allCategories')}`
-                  : t(`categories.${cat}`)}
+                  : (t(`categories.${cat}`) !== `categories.${cat}` ? t(`categories.${cat}`) : cat)}
               </option>
             ))}
           </select>
@@ -278,14 +313,16 @@ export default function Transactions() {
                             onChange={(e) =>
                               handleCategorize(tx.id, e.target.value)
                             }
-                            onBlur={() => setEditingId(null)}
+                            onBlur={() => setTimeout(() => setEditingId(null), 150)}
                             className="px-3 py-2 bg-slate-700 border border-emerald-500/50 rounded-lg text-emerald-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
                           >
-                            {CATEGORY_OPTIONS.map((c) => (
+                            {categoryNames.filter((c) => c !== 'Other').map((c) => (
                               <option key={c} value={c}>
-                                {t(`categories.${c}`)}
+                                {t(`categories.${c}`) !== `categories.${c}` ? t(`categories.${c}`) : c}
                               </option>
                             ))}
+                            <option value="Other">{t('categories.Other')}</option>
+                            <option value="__add__">➕ {t('transactions.addCategory')}</option>
                           </select>
                         ) : (
                           <button
@@ -294,7 +331,7 @@ export default function Transactions() {
                             title={t('transactions.reCategorize')}
                             className="px-4 py-2 bg-emerald-600/30 text-emerald-200 text-xs font-semibold rounded-full hover:bg-emerald-600/50 transition-colors cursor-pointer"
                           >
-                            {t(`categories.${tx.category}`)} ✎
+                            {t(`categories.${tx.category}`) !== `categories.${tx.category}` ? t(`categories.${tx.category}`) : tx.category} ✎
                           </button>
                         )}
                       </td>
@@ -359,6 +396,69 @@ export default function Transactions() {
           );
         })()}
       </div>
+
+      {/* Add Category Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-600/50 rounded-2xl p-8 shadow-2xl w-full max-w-md mx-4">
+            <h3 className="text-2xl font-bold text-white mb-6">
+              {t('transactions.addCategoryTitle')}
+            </h3>
+
+            <div className="space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                  {t('transactions.categoryName')}
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder={t('transactions.categoryName')}
+                  className="w-full px-5 py-3 bg-slate-600/50 border border-slate-500/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                  {t('transactions.categoryType')}
+                </label>
+                <select
+                  value={newCatType}
+                  onChange={(e) => setNewCatType(e.target.value as 'must_have' | 'luxury')}
+                  className="w-full px-5 py-3 bg-slate-600/50 border border-slate-500/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition [color-scheme:dark]"
+                >
+                  <option value="must_have">🏠 {t('transactions.mustHave')}</option>
+                  <option value="luxury">✨ {t('transactions.luxury')}</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <button
+                onClick={handleAddCategory}
+                disabled={!newCatName.trim()}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all transform hover:scale-105"
+              >
+                <span dir="ltr">💾 {t('transactions.save')}</span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setAddForTxId(null);
+                  setNewCatName('');
+                  setNewCatType('must_have');
+                  setEditingId(null);
+                }}
+                className="flex-1 px-6 py-3 bg-slate-600/50 hover:bg-slate-500/50 text-slate-300 rounded-xl font-semibold transition-all"
+              >
+                {t('transactions.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

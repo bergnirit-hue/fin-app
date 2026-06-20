@@ -134,12 +134,26 @@ export default async function handler(
       parseResult.transactions
     );
 
-    // Categorize
+    // Load user-defined categorization rules from DB (applied before defaults)
+    const userRules = await prisma.categorizationRule.findMany({
+      where: { userId: auth.userId, isActive: true },
+    });
     const categorizer = new CategorizationEngine();
+    // Prepend user rules so they take priority over built-in defaults
+    for (const rule of userRules) {
+      categorizer.addRule(rule.merchantPattern, rule.targetCategory);
+    }
     const categorized = categorizer.categorizeMany(dedupResult.merged);
 
-    // Classify
-    const classifier = new ClassificationEngine();
+    // Load user-defined classifications from DB (applied on top of defaults)
+    const userClassifications = await prisma.classification.findMany({
+      where: { userId: auth.userId },
+    });
+    const classificationOverrides: Record<string, string> = {};
+    for (const c of userClassifications) {
+      classificationOverrides[c.category] = c.type;
+    }
+    const classifier = new ClassificationEngine(classificationOverrides);
     const classified = categorized.map((tx) => ({
       ...tx,
       classification: classifier.classify(tx.category),
