@@ -30,6 +30,7 @@ const CC_COMPANY_PATTERNS: RegExp[] = [
   /כ['׳"].?אשראי/i,
   /חיוב.?כרטיס/i,
   /כרטיס.?אשראי/i,
+  /כרטיסי.?אשראי/i,
 ];
 
 /** Returns `true` when the merchant string looks like a credit-card company. */

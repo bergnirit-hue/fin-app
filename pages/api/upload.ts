@@ -70,6 +70,7 @@ export default async function handler(
 
     let parseResult;
     let fileHeaders: string[] = [];
+    let billingTotal: number | null = null;
     const ext = filename.toLowerCase();
 
     if (ext.endsWith('.csv')) {
@@ -111,6 +112,7 @@ export default async function handler(
         const workbook = XLSX.read(buffer, { type: 'buffer' });
         const result = TransactionParser.readExcelSheet(workbook);
         mapping = result.mapping;
+        billingTotal = result.billingTotal;
         fileHeaders = result.data[0] ? Object.keys(result.data[0] as any) : [];
         if (!mapping) {
           console.error('Upload: column detection failed. Headers:', fileHeaders);
@@ -232,11 +234,19 @@ export default async function handler(
     // expandable drill-down and are excluded from summary totals.
     let linkedParentId: string | null = null;
     if (sourceType === 'credit_card' && toInsert.length > 0) {
-      // Use the NET total (charges minus refunds) — this is what the bank
-      // deducts as a single lump sum.  Amounts are already negative for
-      // charges and positive for refunds after the credit-card negate step.
-      const ccTotal = Math.abs(
+      // Prefer the billing total extracted from the file header
+      // (e.g. "₪ 4,088.58") — this is the amount the bank actually debits.
+      // The sum of all transactions in the file can be much larger because
+      // CC files include installment payments from previous billing cycles.
+      // Fall back to the net sum only when no header total was found (CSV
+      // files, or non-standard Excel layouts).
+      const ccTotal = billingTotal ?? Math.abs(
         toInsert.reduce((sum, tx) => sum + tx.amount, 0)
+      );
+      console.log(
+        `Upload: CC reconciliation — billingTotal=${billingTotal}, txSum=${Math.abs(
+          toInsert.reduce((sum, tx) => sum + tx.amount, 0)
+        ).toFixed(2)}, using ccTotal=${ccTotal.toFixed(2)}`
       );
       const ccLatestDate = toInsert.reduce(
         (latest, tx) => (tx.date > latest ? tx.date : latest),

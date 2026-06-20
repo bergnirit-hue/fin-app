@@ -51,9 +51,15 @@ export class TransactionParser {
   // header row (rows 0–9).  Israeli bank exports commonly have a title row
   // like "תנועות בחשבון" above the real column headers.  Returns the parsed
   // rows keyed by the detected headers, plus the column mapping.
+  //
+  // For credit-card files, also extracts the billing total from the header
+  // area (e.g. "גולד - מסטרקארד - 5560 | ₪ 4,088.58") which is the amount
+  // the bank actually debits — distinct from the sum of all transactions
+  // which can include installments from prior billing cycles.
   static readExcelSheet(workbook: XLSX.WorkBook): {
     data: any[];
     mapping: ColumnMapping | null;
+    billingTotal: number | null;
   } {
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
@@ -66,7 +72,9 @@ export class TransactionParser {
 
       const mapping = this.detectColumns(data as any[]);
       if (mapping) {
-        return { data: data as any[], mapping };
+        // Scan pre-header rows for a billing total (CC files).
+        const billingTotal = this.extractBillingTotal(sheet, skip);
+        return { data: data as any[], mapping, billingTotal };
       }
     }
 
@@ -75,7 +83,46 @@ export class TransactionParser {
     return {
       data: XLSX.utils.sheet_to_json(sheet) as any[],
       mapping: null,
+      billingTotal: null,
     };
+  }
+
+  // Scan pre-header rows of the spreadsheet for a billing total.
+  // Israeli CC exports (Isracard, Cal, Max) include a summary line before
+  // the data table, e.g. "גולד - מסטרקארד - 5560 | ₪ 4,088.58".
+  // We extract that amount so reconciliation can match it against the bank
+  // lump-sum debit instead of summing all individual transactions (which
+  // may include installments from prior billing cycles).
+  private static extractBillingTotal(
+    sheet: XLSX.WorkSheet,
+    headerRow: number
+  ): number | null {
+    if (headerRow <= 0) return null;
+
+    // Read the pre-header rows as raw arrays (no header interpretation).
+    const preRows = XLSX.utils.sheet_to_json<any[]>(sheet, {
+      range: 0,
+      header: 1, // raw column-index arrays
+    });
+
+    // Pattern: ₪ followed by optional space and a number (with commas).
+    const amountRe = /₪\s*([\d,]+(?:\.\d+)?)/;
+
+    for (let r = 0; r < Math.min(headerRow, preRows.length); r++) {
+      const row = preRows[r];
+      if (!Array.isArray(row)) continue;
+      for (const cell of row) {
+        if (cell == null) continue;
+        const str = String(cell);
+        const m = str.match(amountRe);
+        if (m) {
+          const total = parseFloat(m[1].replace(/,/g, ''));
+          if (!isNaN(total) && total > 0) return total;
+        }
+      }
+    }
+
+    return null;
   }
 
   static async parseCSV(
