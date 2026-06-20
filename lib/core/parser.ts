@@ -181,9 +181,22 @@ export class TransactionParser {
     sourceType: string
   ): ParsedTransaction | null {
     const date = this.parseDate(row[mapping.dateColumn]);
-    const amount = this.extractAmount(row, mapping);
+    let amount = this.extractAmount(row, mapping);
 
     if (!date || amount === null) return null;
+
+    // Credit-card statements list charges as positive numbers, but they
+    // are expenses.  When using a single amount column (no debit/credit
+    // split) we negate the sign so charges become negative and refunds
+    // (negative in the file) become positive.
+    if (
+      sourceType === 'credit_card' &&
+      mapping.amountColumn &&
+      !mapping.debitColumn &&
+      !mapping.creditColumn
+    ) {
+      amount = -amount;
+    }
 
     const description = mapping.descriptionColumn
       ? String(row[mapping.descriptionColumn] ?? '').trim() || undefined
