@@ -132,7 +132,7 @@ export default function Dashboard() {
           <MetricCard
             title={t('dashboard.totalExpenses')}
             value={formatMoney(metrics.totalExpenses)}
-            change={`-${formatMoney(metrics.totalExpenses)}`}
+            change={`−${formatMoney(metrics.totalExpenses)}`}
             icon="💸"
             color="rose"
             accentColor="from-rose-600/20 to-rose-600/5 border-rose-500/30"
@@ -294,7 +294,7 @@ function MetricCard({
       }`}>
         {value}
       </p>
-      <p className="text-sm text-slate-400">{change}</p>
+      <p className="text-sm text-slate-400"><span dir="ltr">{change}</span></p>
     </div>
   );
 }

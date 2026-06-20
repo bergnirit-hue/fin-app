@@ -267,8 +267,8 @@ export default function Transactions() {
                       <td className="px-6 py-4 text-slate-100 font-semibold">
                         {tx.merchant}
                       </td>
-                      <td className="px-6 py-4 text-end font-bold text-slate-100">
-                        {formatMoney(Math.abs(tx.amount))}
+                      <td className={`px-6 py-4 text-end font-bold ${tx.amount >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <span dir="ltr">{tx.amount >= 0 ? '+' : '−'}{formatMoney(Math.abs(tx.amount))}</span>
                       </td>
                       <td className="px-6 py-4">
                         {editingId === tx.id ? (
@@ -323,36 +323,41 @@ export default function Transactions() {
         </div>
 
         {/* Summary Stats */}
-        {filteredTransactions.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <StatCard
-              icon="📊"
-              label={t('transactions.totalTransactions')}
-              value={filteredTransactions.length.toString()}
-              color="emerald"
-            />
-            <StatCard
-              icon="💸"
-              label={t('transactions.totalAmount')}
-              value={formatMoney(
-                Math.abs(
-                  filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0)
-                )
-              )}
-              color="rose"
-            />
-            <StatCard
-              icon="📈"
-              label={t('transactions.avgTransaction')}
-              value={formatMoney(
-                Math.abs(
-                  filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0)
-                ) / filteredTransactions.length
-              )}
-              color="cyan"
-            />
-          </div>
-        )}
+        {filteredTransactions.length > 0 && (() => {
+          const totalIncome = filteredTransactions
+            .filter((tx) => tx.amount >= 0)
+            .reduce((sum, tx) => sum + tx.amount, 0);
+          const totalExpense = filteredTransactions
+            .filter((tx) => tx.amount < 0)
+            .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+          const net = totalIncome - totalExpense;
+
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <StatCard
+                icon="📥"
+                label={t('dashboard.totalIncome')}
+                value={`+${formatMoney(totalIncome)}`}
+                color="emerald"
+                ltr
+              />
+              <StatCard
+                icon="📤"
+                label={t('dashboard.totalExpenses')}
+                value={`−${formatMoney(totalExpense)}`}
+                color="rose"
+                ltr
+              />
+              <StatCard
+                icon={net >= 0 ? '📈' : '📉'}
+                label={t('dashboard.netSavings')}
+                value={`${net >= 0 ? '+' : '−'}${formatMoney(Math.abs(net))}`}
+                color="cyan"
+                ltr
+              />
+            </div>
+          );
+        })()}
       </div>
     </>
   );
@@ -363,11 +368,13 @@ function StatCard({
   label,
   value,
   color,
+  ltr,
 }: {
   icon: string;
   label: string;
   value: string;
   color: 'emerald' | 'rose' | 'cyan';
+  ltr?: boolean;
 }) {
   const colorGradients = {
     emerald: 'from-emerald-600/10 to-emerald-600/5 border-emerald-500/30',
@@ -385,7 +392,7 @@ function StatCard({
     <div className={`bg-gradient-to-br ${colorGradients[color]} backdrop-blur border rounded-2xl p-6 hover:shadow-lg transition-all`}>
       <p className="text-slate-400 text-sm font-semibold uppercase tracking-wide">{label}</p>
       <p className={`text-4xl font-black mt-3 ${colorValues[color]}`}>
-        {icon} {value}
+        {icon} {ltr ? <span dir="ltr">{value}</span> : value}
       </p>
     </div>
   );
