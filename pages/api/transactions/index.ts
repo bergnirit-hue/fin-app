@@ -17,6 +17,8 @@ export interface TransactionDTO {
   /** `true` when this bank row looks like a CC charge but no detail has
    *  been uploaded yet. */
   detailMissing?: boolean;
+  /** Card label for matched CC entries, e.g. "כרטיס 5560 ע״ש נירית ברג". */
+  cardLabel?: string;
 }
 
 export default async function handler(
@@ -109,6 +111,7 @@ export default async function handler(
       sourceType: r.sourceType,
       ...(details ? { details } : {}),
       ...(looksLikeCC && !details ? { detailMissing: true } : {}),
+      ...(looksLikeCC && r.description ? { cardLabel: r.description } : {}),
     };
   });
 

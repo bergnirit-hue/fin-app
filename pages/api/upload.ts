@@ -71,6 +71,7 @@ export default async function handler(
     let parseResult;
     let fileHeaders: string[] = [];
     let billingTotal: number | null = null;
+    let cardLabel: string | null = null;
     const ext = filename.toLowerCase();
 
     if (ext.endsWith('.csv')) {
@@ -113,6 +114,7 @@ export default async function handler(
         const result = TransactionParser.readExcelSheet(workbook);
         mapping = result.mapping;
         billingTotal = result.billingTotal;
+        cardLabel = result.cardLabel;
         fileHeaders = result.data[0] ? Object.keys(result.data[0] as any) : [];
         if (!mapping) {
           console.error('Upload: column detection failed. Headers:', fileHeaders);
@@ -269,9 +271,18 @@ export default async function handler(
           where: { uploadId: upload.id },
           data: { linkedToId: match.id },
         });
+        // Store the card label on the parent bank entry so the UI can
+        // display it as a tag (e.g. "כרטיס 5560 ע״ש נירית ברג").
+        if (cardLabel) {
+          await prisma.transaction.update({
+            where: { id: match.id },
+            data: { description: cardLabel },
+          });
+        }
         linkedParentId = match.id;
         console.log(
-          `Upload: linked ${toInsert.length} CC details to bank entry "${match.merchant}" (${match.id})`
+          `Upload: linked ${toInsert.length} CC details to bank entry "${match.merchant}" (${match.id})` +
+            (cardLabel ? ` — card: ${cardLabel}` : '')
         );
       }
     }

@@ -60,6 +60,7 @@ export class TransactionParser {
     data: any[];
     mapping: ColumnMapping | null;
     billingTotal: number | null;
+    cardLabel: string | null;
   } {
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
@@ -72,9 +73,14 @@ export class TransactionParser {
 
       const mapping = this.detectColumns(data as any[]);
       if (mapping) {
-        // Scan pre-header rows for a billing total (CC files).
-        const billingTotal = this.extractBillingTotal(sheet, skip);
-        return { data: data as any[], mapping, billingTotal };
+        // Scan pre-header rows for CC metadata (billing total + card label).
+        const ccMeta = this.extractCreditCardMeta(sheet, skip);
+        return {
+          data: data as any[],
+          mapping,
+          billingTotal: ccMeta.billingTotal,
+          cardLabel: ccMeta.cardLabel,
+        };
       }
     }
 
@@ -84,20 +90,23 @@ export class TransactionParser {
       data: XLSX.utils.sheet_to_json(sheet) as any[],
       mapping: null,
       billingTotal: null,
+      cardLabel: null,
     };
   }
 
-  // Scan pre-header rows of the spreadsheet for a billing total.
-  // Israeli CC exports (Isracard, Cal, Max) include a summary line before
-  // the data table, e.g. "גולד - מסטרקארד - 5560 | ₪ 4,088.58".
-  // We extract that amount so reconciliation can match it against the bank
-  // lump-sum debit instead of summing all individual transactions (which
-  // may include installments from prior billing cycles).
-  private static extractBillingTotal(
+  // Scan pre-header rows of the spreadsheet for credit-card metadata:
+  //   • billingTotal — the monthly charge the bank debits (e.g. ₪4,088.58)
+  //   • cardLabel    — human-readable card identifier, e.g.
+  //                    "כרטיס 5560 ע״ש נירית ברג"
+  //
+  // Israeli CC exports (Isracard, Cal, Max) have a consistent header layout:
+  //   Row ~4: "גולד - מסטרקארד - 5560 | ₪ 4,088.58"   (card name + total)
+  //   Row ~5: "על שם נירית ברג | לחיוב ב-10.06"         (cardholder name)
+  private static extractCreditCardMeta(
     sheet: XLSX.WorkSheet,
     headerRow: number
-  ): number | null {
-    if (headerRow <= 0) return null;
+  ): { billingTotal: number | null; cardLabel: string | null } {
+    if (headerRow <= 0) return { billingTotal: null, cardLabel: null };
 
     // Read the pre-header rows as raw arrays (no header interpretation).
     const preRows = XLSX.utils.sheet_to_json<any[]>(sheet, {
@@ -105,24 +114,58 @@ export class TransactionParser {
       header: 1, // raw column-index arrays
     });
 
-    // Pattern: ₪ followed by optional space and a number (with commas).
     const amountRe = /₪\s*([\d,]+(?:\.\d+)?)/;
+    // Last 4 digits of the card number — appears after a dash at the end
+    // of the card name cell, e.g. "גולד - מסטרקארד - 5560".
+    // The dash prefix prevents matching years like "2026" from title rows.
+    const last4Re = /[-–]\s*(\d{4})\s*$/;
+    // Cardholder line: "על שם NAME" (possibly followed by other info).
+    const holderRe = /על\s+שם\s+(.+)/;
+
+    let billingTotal: number | null = null;
+    let last4: string | null = null;
+    let holderName: string | null = null;
 
     for (let r = 0; r < Math.min(headerRow, preRows.length); r++) {
       const row = preRows[r];
       if (!Array.isArray(row)) continue;
       for (const cell of row) {
         if (cell == null) continue;
-        const str = String(cell);
-        const m = str.match(amountRe);
-        if (m) {
-          const total = parseFloat(m[1].replace(/,/g, ''));
-          if (!isNaN(total) && total > 0) return total;
+        const str = String(cell).trim();
+
+        // Billing total (₪ amount)
+        if (!billingTotal) {
+          const am = str.match(amountRe);
+          if (am) {
+            const total = parseFloat(am[1].replace(/,/g, ''));
+            if (!isNaN(total) && total > 0) billingTotal = total;
+          }
+        }
+
+        // Last 4 digits of card number (from the card-name cell,
+        // same row that has the billing total or the row before it).
+        if (!last4) {
+          const dm = str.match(last4Re);
+          if (dm) last4 = dm[1];
+        }
+
+        // Cardholder name ("על שם …")
+        if (!holderName) {
+          const hm = str.match(holderRe);
+          if (hm) holderName = hm[1].trim();
         }
       }
     }
 
-    return null;
+    // Build the card label: "כרטיס 5560 ע״ש נירית ברג"
+    let cardLabel: string | null = null;
+    if (last4 && holderName) {
+      cardLabel = `כרטיס ${last4} ע״ש ${holderName}`;
+    } else if (last4) {
+      cardLabel = `כרטיס ${last4}`;
+    }
+
+    return { billingTotal, cardLabel };
   }
 
   static async parseCSV(

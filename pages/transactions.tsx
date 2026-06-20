@@ -13,6 +13,7 @@ interface Transaction {
   sourceType: string;
   details?: Transaction[];
   detailMissing?: boolean;
+  cardLabel?: string;
 }
 
 export default function Transactions() {
@@ -126,6 +127,10 @@ export default function Transactions() {
   };
 
   useEffect(() => {
+    // On auto-exported pages the router is not ready on the first render.
+    // Wait until `isReady` before reading query params or navigating.
+    if (!router.isReady) return;
+
     const token = localStorage.getItem('token');
     if (!token) {
       router.push('/login');
@@ -157,7 +162,7 @@ export default function Transactions() {
         setLoading(false);
       }
     })();
-  }, [router, selectedCategory, classificationFilter, startDate, endDate]);
+  }, [router.isReady, selectedCategory, classificationFilter, startDate, endDate]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -326,7 +331,7 @@ export default function Transactions() {
                             {formatDate(tx.date)}
                           </td>
                           <td className="px-6 py-4 text-slate-100 font-semibold">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               {expandable && (
                                 <span
                                   className={`text-xs text-slate-400 transition-transform inline-block ${
@@ -345,6 +350,11 @@ export default function Transactions() {
                               {expandable && (
                                 <span className="px-2 py-0.5 bg-cyan-600/20 text-cyan-300 text-[10px] font-bold rounded-full whitespace-nowrap">
                                   💳 {tx.details!.length} {t('transactions.charges')}
+                                </span>
+                              )}
+                              {tx.cardLabel && (
+                                <span className="px-2 py-0.5 bg-violet-600/25 text-violet-300 text-[10px] font-bold rounded-full whitespace-nowrap">
+                                  {tx.cardLabel}
                                 </span>
                               )}
                             </div>
