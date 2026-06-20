@@ -11,6 +11,9 @@ export interface ColumnMapping {
   creditColumn?: string; // money in
   merchantColumn: string;
   descriptionColumn?: string;
+  // When amountColumn is "סכום חיוב" (always positive), this column
+  // (typically "סכום עסקה") carries the sign: negative = refund/credit.
+  signReferenceColumn?: string;
 }
 
 export interface ParsedTransaction {
@@ -275,6 +278,17 @@ export class TransactionParser {
 
     if (!date || amount === null) return null;
 
+    // When "סכום חיוב" is used as the amount column it is always
+    // positive — even for refunds/credits.  The sign lives in the
+    // reference column ("סכום עסקה"): if that value is negative the
+    // billing amount should be negative too.
+    if (mapping.signReferenceColumn) {
+      const refVal = this.parseAmount(row[mapping.signReferenceColumn]);
+      if (refVal !== null && refVal < 0 && amount > 0) {
+        amount = -amount;
+      }
+    }
+
     // Credit-card statements list charges as positive numbers, but they
     // are expenses.  When using a single amount column (no debit/credit
     // split) we negate the sign so charges become negative and refunds
@@ -345,6 +359,16 @@ export class TransactionParser {
     // generic "סכום" / "amount" pattern for bank statements and other files.
     const amountColumn =
       find(/סכום.?חיוב/i) || find(/amount|סכום|transaction amount/i);
+
+    // When "סכום חיוב" is selected, it's always positive — even for
+    // refunds.  "סכום עסקה" carries the correct sign (negative = credit),
+    // so we keep it as a sign reference.
+    let signReferenceColumn: string | undefined;
+    if (amountColumn && /סכום.?חיוב/i.test(amountColumn)) {
+      const ref = find(/סכום.?עסקה/i);
+      if (ref) signReferenceColumn = ref;
+    }
+
     const descriptionColumn = find(/description|notes|memo|פרטים|הערות/i);
 
     if (
@@ -362,6 +386,7 @@ export class TransactionParser {
       ...(debitColumn ? { debitColumn } : {}),
       ...(creditColumn ? { creditColumn } : {}),
       ...(descriptionColumn ? { descriptionColumn } : {}),
+      ...(signReferenceColumn ? { signReferenceColumn } : {}),
     };
   }
 
