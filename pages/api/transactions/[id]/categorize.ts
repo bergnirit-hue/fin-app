@@ -74,6 +74,20 @@ export default async function handler(
     }
   }
 
+  // Bulk-update all other transactions with the same merchant name.
+  let bulkUpdated = 0;
+  if (createRule && existing.merchant) {
+    const result = await prisma.transaction.updateMany({
+      where: {
+        userId: auth.userId,
+        merchant: existing.merchant.trim(),
+        id: { not: id },
+      },
+      data: { category, classification },
+    });
+    bulkUpdated = result.count;
+  }
+
   const transaction: TransactionDTO = {
     id: updated.id,
     date: updated.date.toISOString(),
@@ -84,5 +98,5 @@ export default async function handler(
     sourceType: updated.sourceType,
   };
 
-  return res.status(200).json({ transaction });
+  return res.status(200).json({ transaction, bulkUpdated });
 }

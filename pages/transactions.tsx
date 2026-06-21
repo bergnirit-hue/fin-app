@@ -81,16 +81,36 @@ export default function Transactions() {
       });
       if (!res.ok) return;
       const data = await res.json();
+      const { category: newCat, classification: newClass } = data.transaction;
+      const merchantName = data.transaction.merchant;
+      const didBulk = (data.bulkUpdated ?? 0) > 0;
+
+      const applyBulkToDetails = (details?: Transaction[]) =>
+        details?.map((d) =>
+          d.merchant === merchantName ? { ...d, category: newCat, classification: newClass } : d
+        );
+
       setTransactions((prev) =>
         prev.map((t) => {
-          if (t.id === id) return { ...t, ...data.transaction, details: t.details };
+          if (t.id === id) {
+            const details = didBulk ? applyBulkToDetails(t.details) : t.details;
+            return { ...t, ...data.transaction, details };
+          }
           if (t.details) {
             const idx = t.details.findIndex((d) => d.id === id);
             if (idx !== -1) {
-              const updated = [...t.details];
-              updated[idx] = { ...updated[idx], ...data.transaction };
+              const updated = didBulk
+                ? applyBulkToDetails(t.details)!
+                : [...t.details];
+              if (!didBulk) updated[idx] = { ...updated[idx], ...data.transaction };
               return { ...t, details: updated };
             }
+          }
+          if (didBulk && t.merchant === merchantName) {
+            return { ...t, category: newCat, classification: newClass, details: applyBulkToDetails(t.details) };
+          }
+          if (didBulk && t.details?.some((d) => d.merchant === merchantName)) {
+            return { ...t, details: applyBulkToDetails(t.details) };
           }
           return t;
         })
