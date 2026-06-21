@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/utils/db';
 import { extractUserFromRequest } from '@/lib/utils/auth';
 import { ClassificationEngine } from '@/lib/core/classification';
+import { isPaymentServiceProxy } from '@/lib/core/deduplication';
 import type { TransactionDTO } from '../index';
 
 export default async function handler(
@@ -52,8 +53,11 @@ export default async function handler(
   // Auto-create a categorization rule: merchant → category.
   // Uses the exact merchant name as the pattern so future uploads of the
   // same merchant are categorized automatically.
+  // Skip for payment service proxies (BIT, PayPal, etc.) — each transfer
+  // may serve a different purpose.
   const createRule = req.body?.createRule !== false; // default true
-  if (createRule && existing.merchant) {
+  const isProxy = isPaymentServiceProxy(existing.merchant);
+  if (createRule && existing.merchant && !isProxy) {
     const pattern = existing.merchant.trim();
     const existingRule = await prisma.categorizationRule.findFirst({
       where: { userId: auth.userId, merchantPattern: pattern },
@@ -76,7 +80,7 @@ export default async function handler(
 
   // Bulk-update all other transactions with the same merchant name.
   let bulkUpdated = 0;
-  if (createRule && existing.merchant) {
+  if (createRule && existing.merchant && !isProxy) {
     const result = await prisma.transaction.updateMany({
       where: {
         userId: auth.userId,

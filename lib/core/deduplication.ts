@@ -11,7 +11,7 @@ export interface ConflictResolution {
   selectedIndex?: number;
 }
 
-const PAYMENT_SERVICE_KEYWORDS = [
+export const PAYMENT_SERVICE_KEYWORDS = [
   'bit',
   'paypal',
   'google pay',
@@ -20,6 +20,11 @@ const PAYMENT_SERVICE_KEYWORDS = [
   'square',
   '2pay',
 ];
+
+export function isPaymentServiceProxy(merchant: string): boolean {
+  const lower = merchant.toLowerCase();
+  return PAYMENT_SERVICE_KEYWORDS.some((kw) => lower.includes(kw));
+}
 
 export class DeduplicationEngine {
   static deduplicateAndMap(
@@ -158,10 +163,7 @@ export class DeduplicationEngine {
   }
 
   private static isPaymentServiceProxy(merchant: string): boolean {
-    const lowerMerchant = merchant.toLowerCase();
-    return PAYMENT_SERVICE_KEYWORDS.some((keyword) =>
-      lowerMerchant.includes(keyword)
-    );
+    return isPaymentServiceProxy(merchant);
   }
 
   static getConfidenceScore(
