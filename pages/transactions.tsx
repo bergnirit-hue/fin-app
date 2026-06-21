@@ -24,7 +24,7 @@ export default function Transactions() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [classificationFilter, setClassificationFilter] =
-    useState<'all' | 'must_have' | 'luxury'>('all');
+    useState<'all' | 'fixed' | 'variable' | 'savings_debt' | 'income'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -32,8 +32,10 @@ export default function Transactions() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForTxId, setAddForTxId] = useState<string | null>(null);
   const [newCatName, setNewCatName] = useState('');
-  const [newCatType, setNewCatType] = useState<'must_have' | 'luxury'>('must_have');
+  const [newCatType, setNewCatType] = useState<'fixed' | 'variable' | 'savings_debt' | 'income'>('variable');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [sortColumn, setSortColumn] = useState<'date' | 'merchant' | 'amount' | 'category' | 'classification' | 'sourceType'>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   // Load categories from API (built-in + custom)
   useEffect(() => {
@@ -80,7 +82,18 @@ export default function Transactions() {
       if (!res.ok) return;
       const data = await res.json();
       setTransactions((prev) =>
-        prev.map((t) => (t.id === id ? data.transaction : t))
+        prev.map((t) => {
+          if (t.id === id) return { ...t, ...data.transaction, details: t.details };
+          if (t.details) {
+            const idx = t.details.findIndex((d) => d.id === id);
+            if (idx !== -1) {
+              const updated = [...t.details];
+              updated[idx] = { ...updated[idx], ...data.transaction };
+              return { ...t, details: updated };
+            }
+          }
+          return t;
+        })
       );
     } catch {
       // keep the existing value on failure
@@ -123,7 +136,7 @@ export default function Transactions() {
     setShowAddModal(false);
     setAddForTxId(null);
     setNewCatName('');
-    setNewCatType('must_have');
+    setNewCatType('variable');
   };
 
   useEffect(() => {
@@ -175,11 +188,48 @@ export default function Transactions() {
 
   // Merchant search is applied client-side for instant feedback; category,
   // classification, and date filters are handled server-side by the API.
-  const filteredTransactions = searchQuery
+  const searched = searchQuery
     ? transactions.filter((t) =>
         t.merchant.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : transactions;
+
+  const filteredTransactions = [...searched].sort((a, b) => {
+    let cmp = 0;
+    switch (sortColumn) {
+      case 'date':
+        cmp = new Date(a.date).getTime() - new Date(b.date).getTime();
+        break;
+      case 'merchant':
+        cmp = a.merchant.localeCompare(b.merchant);
+        break;
+      case 'amount':
+        cmp = a.amount - b.amount;
+        break;
+      case 'category':
+        cmp = (a.category ?? '').localeCompare(b.category ?? '');
+        break;
+      case 'classification':
+        cmp = (a.classification ?? '').localeCompare(b.classification ?? '');
+        break;
+      case 'sourceType':
+        cmp = a.sourceType.localeCompare(b.sourceType);
+        break;
+    }
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const toggleSort = (col: typeof sortColumn) => {
+    if (sortColumn === col) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(col);
+      setSortDir(col === 'amount' ? 'desc' : 'asc');
+    }
+  };
+
+  const sortIndicator = (col: typeof sortColumn) =>
+    sortColumn === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
 
   // Translate a source type (e.g. "bank" -> "בנק"), falling back to the raw
   // value for compound sources like "bank+bit".
@@ -245,14 +295,16 @@ export default function Transactions() {
             value={classificationFilter}
             onChange={(e) =>
               setClassificationFilter(
-                e.target.value as 'all' | 'must_have' | 'luxury'
+                e.target.value as 'all' | 'fixed' | 'variable' | 'savings_debt' | 'income'
               )
             }
             className="px-5 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
           >
             <option value="all">🔹 {t('transactions.allTypes')}</option>
-            <option value="must_have">🏠 {t('transactions.mustHave')}</option>
-            <option value="luxury">✨ {t('transactions.luxury')}</option>
+            <option value="income">💰 {t('transactions.income')}</option>
+            <option value="fixed">📌 {t('transactions.fixed')}</option>
+            <option value="variable">📊 {t('transactions.variable')}</option>
+            <option value="savings_debt">🏦 {t('transactions.savingsDebt')}</option>
           </select>
 
           {/* Date Range Filter */}
@@ -287,23 +339,23 @@ export default function Transactions() {
               <table className="w-full">
                 <thead className="bg-slate-700/50 border-b border-slate-600/50">
                   <tr>
-                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
-                      📅 {t('transactions.thDate')}
+                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide cursor-pointer hover:text-emerald-300 transition-colors select-none" onClick={() => toggleSort('date')}>
+                      📅 {t('transactions.thDate')}{sortIndicator('date')}
                     </th>
-                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
-                      🛍️ {t('transactions.thMerchant')}
+                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide cursor-pointer hover:text-emerald-300 transition-colors select-none" onClick={() => toggleSort('merchant')}>
+                      🛍️ {t('transactions.thMerchant')}{sortIndicator('merchant')}
                     </th>
-                    <th className="text-end px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
-                      💵 {t('transactions.thAmount')}
+                    <th className="text-end px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide cursor-pointer hover:text-emerald-300 transition-colors select-none" onClick={() => toggleSort('amount')}>
+                      💵 {t('transactions.thAmount')}{sortIndicator('amount')}
                     </th>
-                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
-                      📂 {t('transactions.thCategory')}
+                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide cursor-pointer hover:text-emerald-300 transition-colors select-none" onClick={() => toggleSort('category')}>
+                      📂 {t('transactions.thCategory')}{sortIndicator('category')}
                     </th>
-                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
-                      🏷️ {t('transactions.thType')}
+                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide cursor-pointer hover:text-emerald-300 transition-colors select-none" onClick={() => toggleSort('classification')}>
+                      🏷️ {t('transactions.thType')}{sortIndicator('classification')}
                     </th>
-                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
-                      📍 {t('transactions.thSource')}
+                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide cursor-pointer hover:text-emerald-300 transition-colors select-none" onClick={() => toggleSort('sourceType')}>
+                      📍 {t('transactions.thSource')}{sortIndicator('sourceType')}
                     </th>
                   </tr>
                 </thead>
@@ -393,17 +445,7 @@ export default function Transactions() {
                             )}
                           </td>
                           <td className="px-6 py-4">
-                            <span
-                              className={`px-4 py-2 text-xs font-semibold rounded-full ${
-                                tx.classification === 'must_have'
-                                  ? 'bg-cyan-600/30 text-cyan-200'
-                                  : 'bg-violet-600/30 text-violet-200'
-                              }`}
-                            >
-                              {tx.classification === 'must_have'
-                                ? `🏠 ${t('transactions.mustHave')}`
-                                : `✨ ${t('transactions.luxury')}`}
-                            </span>
+                            <ClassificationBadge classification={tx.classification} t={t} />
                           </td>
                           <td className="px-6 py-4 text-slate-400 text-sm font-medium">
                             {sourceLabel(tx.sourceType)}
@@ -427,16 +469,35 @@ export default function Transactions() {
                                 <span dir="ltr">{d.amount >= 0 ? '+' : '−'}{formatMoney(Math.abs(d.amount))}</span>
                               </td>
                               <td className="px-6 py-3">
-                                <span className="px-3 py-1 bg-emerald-600/20 text-emerald-300 text-[10px] font-semibold rounded-full">
-                                  {t(`categories.${d.category}`) !== `categories.${d.category}` ? t(`categories.${d.category}`) : d.category}
-                                </span>
+                                {editingId === d.id ? (
+                                  <select
+                                    autoFocus
+                                    value={d.category}
+                                    onChange={(e) => handleCategorize(d.id, e.target.value)}
+                                    onBlur={() => setTimeout(() => setEditingId(null), 150)}
+                                    className="px-2 py-1 bg-slate-700 border border-emerald-500/50 rounded-lg text-emerald-100 text-[10px] font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                                  >
+                                    {categoryNames.filter((c) => c !== 'Other').map((c) => (
+                                      <option key={c} value={c}>
+                                        {t(`categories.${c}`) !== `categories.${c}` ? t(`categories.${c}`) : c}
+                                      </option>
+                                    ))}
+                                    <option value="Other">{t('categories.Other')}</option>
+                                    <option value="__add__">➕ {t('transactions.addCategory')}</option>
+                                  </select>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setEditingId(d.id); }}
+                                    title={t('transactions.reCategorize')}
+                                    className="px-3 py-1 bg-emerald-600/20 text-emerald-300 text-[10px] font-semibold rounded-full hover:bg-emerald-600/40 transition-colors cursor-pointer"
+                                  >
+                                    {t(`categories.${d.category}`) !== `categories.${d.category}` ? t(`categories.${d.category}`) : d.category} ✎
+                                  </button>
+                                )}
                               </td>
                               <td className="px-6 py-3">
-                                <span className="text-xs text-slate-500">
-                                  {d.classification === 'must_have'
-                                    ? `🏠 ${t('transactions.mustHave')}`
-                                    : `✨ ${t('transactions.luxury')}`}
-                                </span>
+                                <ClassificationBadge classification={d.classification} t={t} small />
                               </td>
                               <td className="px-6 py-3 text-slate-500 text-xs">
                                 💳
@@ -519,11 +580,13 @@ export default function Transactions() {
                 </label>
                 <select
                   value={newCatType}
-                  onChange={(e) => setNewCatType(e.target.value as 'must_have' | 'luxury')}
+                  onChange={(e) => setNewCatType(e.target.value as 'fixed' | 'variable' | 'savings_debt' | 'income')}
                   className="w-full px-5 py-3 bg-slate-600/50 border border-slate-500/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition [color-scheme:dark]"
                 >
-                  <option value="must_have">🏠 {t('transactions.mustHave')}</option>
-                  <option value="luxury">✨ {t('transactions.luxury')}</option>
+                  <option value="income">💰 {t('transactions.income')}</option>
+                  <option value="fixed">📌 {t('transactions.fixed')}</option>
+                  <option value="variable">📊 {t('transactions.variable')}</option>
+                  <option value="savings_debt">🏦 {t('transactions.savingsDebt')}</option>
                 </select>
               </div>
             </div>
@@ -541,7 +604,7 @@ export default function Transactions() {
                   setShowAddModal(false);
                   setAddForTxId(null);
                   setNewCatName('');
-                  setNewCatType('must_have');
+                  setNewCatType('variable');
                   setEditingId(null);
                 }}
                 className="flex-1 px-6 py-3 bg-slate-600/50 hover:bg-slate-500/50 text-slate-300 rounded-xl font-semibold transition-all"
@@ -559,6 +622,38 @@ export default function Transactions() {
 /** Thin wrapper so we can return multiple `<tr>` elements from a `.map()`. */
 function TransactionRows({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
+}
+
+function ClassificationBadge({
+  classification,
+  t,
+  small,
+}: {
+  classification: string;
+  t: (key: string) => string;
+  small?: boolean;
+}) {
+  const config: Record<string, { icon: string; bg: string; text: string; label: string }> = {
+    income: { icon: '💰', bg: 'bg-emerald-600/30', text: 'text-emerald-200', label: t('transactions.income') },
+    fixed: { icon: '📌', bg: 'bg-cyan-600/30', text: 'text-cyan-200', label: t('transactions.fixed') },
+    variable: { icon: '📊', bg: 'bg-violet-600/30', text: 'text-violet-200', label: t('transactions.variable') },
+    savings_debt: { icon: '🏦', bg: 'bg-amber-600/30', text: 'text-amber-200', label: t('transactions.savingsDebt') },
+  };
+  const c = config[classification] || config.variable;
+
+  if (small) {
+    return (
+      <span className={`text-xs text-slate-500`}>
+        {c.icon} {c.label}
+      </span>
+    );
+  }
+
+  return (
+    <span className={`px-4 py-2 text-xs font-semibold rounded-full ${c.bg} ${c.text}`}>
+      {c.icon} {c.label}
+    </span>
+  );
 }
 
 function StatCard({

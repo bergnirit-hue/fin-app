@@ -91,7 +91,7 @@ export default async function handler(
       merchant: r.merchant,
       amount: r.amount,
       category: r.category ?? 'Other',
-      classification: r.classification ?? 'luxury',
+      classification: r.classification ?? 'variable',
       sourceType: r.sourceType,
     });
   }
@@ -107,7 +107,7 @@ export default async function handler(
       merchant: r.merchant,
       amount: r.amount,
       category: r.category ?? 'Other',
-      classification: r.classification ?? 'luxury',
+      classification: r.classification ?? 'variable',
       sourceType: r.sourceType,
       ...(details ? { details } : {}),
       ...(looksLikeCC && !details ? { detailMissing: true } : {}),

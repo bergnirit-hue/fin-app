@@ -35,7 +35,7 @@ export default async function handler(
     return res.status(404).json({ message: 'Transaction not found' });
   }
 
-  // Re-derive the must-have / luxury classification from the new category.
+  // Re-derive the classification from the new category.
   // Check user-defined classifications first, then fall back to defaults.
   const userClassification = await prisma.classification.findFirst({
     where: { userId: auth.userId, category },
@@ -80,7 +80,7 @@ export default async function handler(
     merchant: updated.merchant,
     amount: updated.amount,
     category: updated.category ?? 'Other',
-    classification: updated.classification ?? 'luxury',
+    classification: updated.classification ?? 'variable',
     sourceType: updated.sourceType,
   };
 

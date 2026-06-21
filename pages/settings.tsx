@@ -309,14 +309,18 @@ export default function Settings() {
                         >
                           <div className="flex items-center gap-3">
                             <span className="text-2xl">
-                              {cat.classification === 'must_have' ? '🏠' : '✨'}
+                              {cat.classification === 'income' ? '💰' : cat.classification === 'fixed' ? '📌' : cat.classification === 'savings_debt' ? '🏦' : '📊'}
                             </span>
                             <div>
                               <p className="text-white font-semibold">{label}</p>
                               <p className="text-slate-400 text-sm">
-                                {cat.classification === 'must_have'
-                                  ? t('transactions.mustHave')
-                                  : t('transactions.luxury')}
+                                {cat.classification === 'income'
+                                  ? t('transactions.income')
+                                  : cat.classification === 'fixed'
+                                  ? t('transactions.fixed')
+                                  : cat.classification === 'savings_debt'
+                                  ? t('transactions.savingsDebt')
+                                  : t('transactions.variable')}
                                 {' · '}
                                 <span className={`text-xs font-semibold ${cat.isCustom ? 'text-emerald-400' : 'text-slate-500'}`}>
                                   {cat.isCustom ? t('settings.customBadge') : t('settings.builtInBadge')}

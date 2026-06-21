@@ -7,7 +7,7 @@ import { extractUserFromRequest } from '@/lib/utils/auth';
 import { TransactionParser, ColumnMapping } from '@/lib/core/parser';
 import { DeduplicationEngine } from '@/lib/core/deduplication';
 import { CategorizationEngine } from '@/lib/core/categorization';
-import { ClassificationEngine } from '@/lib/core/classification';
+import { ClassificationEngine, ClassificationType } from '@/lib/core/classification';
 import { findMatchingBankEntry, looksLikeCreditCardFile } from '@/lib/core/reconciliation';
 
 interface UploadResponse {
@@ -210,15 +210,19 @@ export default async function handler(
     const userClassifications = await prisma.classification.findMany({
       where: { userId: auth.userId },
     });
-    const classificationOverrides: Record<string, string> = {};
+    const classificationOverrides: Record<string, ClassificationType> = {};
     for (const c of userClassifications) {
-      classificationOverrides[c.category] = c.type;
+      classificationOverrides[c.category] = c.type as ClassificationType;
     }
     const classifier = new ClassificationEngine(classificationOverrides);
-    const classified = categorized.map((tx) => ({
-      ...tx,
-      classification: classifier.classify(tx.category),
-    }));
+    const classified = categorized.map((tx) => {
+      const category = tx.amount > 0 ? 'Income' : tx.category;
+      return {
+        ...tx,
+        category,
+        classification: classifier.classify(category),
+      };
+    });
 
     // Filter out rows that already exist in the DB for this user
     // (so re-uploading the same file does not create duplicates).

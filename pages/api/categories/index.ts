@@ -6,7 +6,7 @@ import { DEFAULT_CLASSIFICATIONS } from '@/lib/core/classification';
 export interface CategoryDTO {
   id?: string;
   name: string;
-  classification: string; // "must_have" | "luxury"
+  classification: string; // "fixed" | "variable" | "savings_debt"
   isCustom: boolean;
 }
 
@@ -73,10 +73,10 @@ async function handlePost(
   if (!name) {
     return res.status(400).json({ message: 'name is required' });
   }
-  if (!['must_have', 'luxury'].includes(classification)) {
+  if (!['fixed', 'variable', 'savings_debt', 'income'].includes(classification)) {
     return res
       .status(400)
-      .json({ message: 'classification must be "must_have" or "luxury"' });
+      .json({ message: 'classification must be "fixed", "variable", "savings_debt", or "income"' });
   }
 
   // Check if this category already exists for the user

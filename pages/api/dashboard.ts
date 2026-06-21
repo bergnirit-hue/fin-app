@@ -13,8 +13,10 @@ export interface DashboardResponse {
   totalExpenses: number;
   savings: number;
   savingsPercentage: number;
-  mustHave: number;
-  luxury: number;
+  fixed: number;
+  variable: number;
+  savingsDebt: number;
+  incomeClassification: number;
   byCategory: { [category: string]: number };
   transactionCount: number;
 }
@@ -25,8 +27,10 @@ const EMPTY: DashboardResponse = {
   totalExpenses: 0,
   savings: 0,
   savingsPercentage: 0,
-  mustHave: 0,
-  luxury: 0,
+  fixed: 0,
+  variable: 0,
+  savingsDebt: 0,
+  incomeClassification: 0,
   byCategory: {},
   transactionCount: 0,
 };
@@ -60,7 +64,7 @@ export default async function handler(
     description: r.description ?? undefined,
     sourceType: r.sourceType,
     category: r.category ?? 'Other',
-    classification: (r.classification as ClassificationType) ?? 'luxury',
+    classification: (r.classification as ClassificationType) ?? 'variable',
   }));
 
   // Reuse CalculationEngine over every year present in the data for the
@@ -71,16 +75,20 @@ export default async function handler(
 
   let totalIncome = 0;
   let totalExpenses = 0;
-  let mustHave = 0;
-  let luxury = 0;
+  let fixed = 0;
+  let variable = 0;
+  let savingsDebt = 0;
+  let incomeClassification = 0;
 
   for (const year of years) {
     const yearly = CalculationEngine.calculateYearly(transactions, year);
     totalIncome += yearly.totalIncome;
     totalExpenses += yearly.totalExpenses;
     for (const month of yearly.months) {
-      mustHave += month.byClassification.must_have;
-      luxury += month.byClassification.luxury;
+      fixed += month.byClassification.fixed;
+      variable += month.byClassification.variable;
+      savingsDebt += month.byClassification.savings_debt;
+      incomeClassification += month.byClassification.income;
     }
   }
 
@@ -106,8 +114,10 @@ export default async function handler(
     totalExpenses,
     savings,
     savingsPercentage,
-    mustHave,
-    luxury,
+    fixed,
+    variable,
+    savingsDebt,
+    incomeClassification,
     byCategory,
     transactionCount: transactions.length,
   });

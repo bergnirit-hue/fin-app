@@ -8,8 +8,10 @@ interface DashboardMetrics {
   totalExpenses: number;
   savings: number;
   savingsPercentage: number;
-  mustHave: number;
-  luxury: number;
+  fixed: number;
+  variable: number;
+  savingsDebt: number;
+  incomeClassification: number;
   byCategory: { [key: string]: number };
 }
 
@@ -57,8 +59,10 @@ export default function Dashboard() {
             totalExpenses: data.totalExpenses,
             savings: data.savings,
             savingsPercentage: data.savingsPercentage,
-            mustHave: data.mustHave,
-            luxury: data.luxury,
+            fixed: data.fixed,
+            variable: data.variable,
+            savingsDebt: data.savingsDebt,
+            incomeClassification: data.incomeClassification,
             byCategory: data.byCategory,
           });
         }
@@ -215,21 +219,27 @@ export default function Dashboard() {
             <div className="space-y-4">
               <SummaryRow
                 label={t('dashboard.income')}
-                value={formatMoney(metrics.totalIncome)}
+                value={formatMoney(metrics.incomeClassification)}
                 color="emerald"
-                icon="📥"
+                icon="💰"
               />
               <SummaryRow
-                label={t('dashboard.mustHave')}
-                value={formatMoney(metrics.mustHave)}
+                label={t('dashboard.fixed')}
+                value={formatMoney(metrics.fixed)}
                 color="cyan"
-                icon="🏠"
+                icon="📌"
               />
               <SummaryRow
-                label={t('dashboard.luxury')}
-                value={formatMoney(metrics.luxury)}
+                label={t('dashboard.variable')}
+                value={formatMoney(metrics.variable)}
                 color="violet"
-                icon="✨"
+                icon="📊"
+              />
+              <SummaryRow
+                label={t('dashboard.savingsDebt')}
+                value={formatMoney(metrics.savingsDebt)}
+                color="emerald"
+                icon="🏦"
               />
 
               <div className="border-t border-slate-600/50 pt-4 mt-6">

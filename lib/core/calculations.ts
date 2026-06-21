@@ -21,8 +21,10 @@ export interface MonthlyMetrics {
     };
   };
   byClassification: {
-    must_have: number;
-    luxury: number;
+    fixed: number;
+    variable: number;
+    savings_debt: number;
+    income: number;
   };
 }
 
@@ -54,7 +56,7 @@ export class CalculationEngine {
     const byCategory: {
       [key: string]: { amount: number; count: number };
     } = {};
-    const byClassification = { must_have: 0, luxury: 0 };
+    const byClassification = { fixed: 0, variable: 0, savings_debt: 0, income: 0 };
 
     for (const tx of monthTransactions) {
       if (tx.amount > 0) {
@@ -71,9 +73,7 @@ export class CalculationEngine {
       byCategory[tx.category].count += 1;
 
       // Classification aggregation
-      if (tx.amount < 0) {
-        byClassification[tx.classification] += Math.abs(tx.amount);
-      }
+      byClassification[tx.classification] += Math.abs(tx.amount);
     }
 
     const savings = income - expenses;

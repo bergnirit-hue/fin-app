@@ -1,32 +1,31 @@
-export type ClassificationType = 'must_have' | 'luxury';
+export type ClassificationType = 'fixed' | 'variable' | 'savings_debt' | 'income';
 
 export interface ClassificationMap {
   [category: string]: ClassificationType;
 }
 
 export const DEFAULT_CLASSIFICATIONS: ClassificationMap = {
-  // Must-have expenses
-  Groceries: 'must_have',
-  Housing: 'must_have',
-  Utilities: 'must_have',
-  Transportation: 'must_have',
-  Health: 'must_have',
-  Insurance: 'must_have',
-  Education: 'must_have',
+  // Fixed Expenses — recurring, hard to reduce short-term
+  Housing: 'fixed',
+  Utilities: 'fixed',
+  Transportation: 'fixed',
 
-  // Luxury/Extra expenses
-  Dining: 'luxury',
-  Entertainment: 'luxury',
-  Shopping: 'luxury',
-  Subscriptions: 'luxury',
-  Travel: 'luxury',
-  'Personal Care': 'luxury',
-  Pets: 'luxury',
-  Gifts: 'luxury',
-  Office: 'luxury',
+  // Variable Expenses — fluctuate monthly, easier to cut
+  'Food & Shopping': 'variable',
+  Health: 'variable',
+  Leisure: 'variable',
+  Education: 'variable',
+
+  // Savings & Debt — allocations for the future / existing loans
+  'Emergency Fund': 'savings_debt',
+  'Long-term Savings': 'savings_debt',
+  'Debt Repayment': 'savings_debt',
+
+  // Income
+  Income: 'income',
 
   // Default
-  Other: 'luxury',
+  Other: 'variable',
 };
 
 export class ClassificationEngine {
@@ -40,7 +39,7 @@ export class ClassificationEngine {
   }
 
   classify(category: string): ClassificationType {
-    return this.classifications[category] || 'luxury';
+    return this.classifications[category] || 'variable';
   }
 
   setClassification(

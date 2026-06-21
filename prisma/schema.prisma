@@ -66,7 +66,7 @@ model Transaction {
   merchant          String
   description       String?
   category          String?
-  classification    String?   // "must_have" or "luxury"
+  classification    String?   // "fixed", "variable", "savings_debt", or "income"
   sourceType        String    // "bank", "bit", "paypal", "google_pay", etc.
   linkedToId        String?   // Link to the duplicate/merged transaction
   isDuplicate       Boolean   @default(false)
@@ -125,7 +125,7 @@ model Classification {
   householdId  String?
   userId       String?
   category     String
-  type         String  // "must_have" or "luxury"
+  type         String  // "fixed", "variable", "savings_debt", or "income"
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
