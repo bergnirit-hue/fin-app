@@ -25,8 +25,8 @@ export const DEFAULT_RULES: CategorizationRule[] = [
   { pattern: /supermarket|grocery|safeway|whole foods|trader joe|kroger|walmart|costco|market|tesco|sainsbury/i, category: 'Food & Shopping' },
   { pattern: /שופרסל|רמי לוי|ויקטורי|יוחננוף|טיב טעם|מגה בעיר|יינות ביתן|אושר עד|מחסני השוק|מכולת|סופרמרקט|am.?pm/i, category: 'Food & Shopping' },
   { pattern: /סופר.?פארם|ניו.?פארם|בית מרקחת/i, category: 'Food & Shopping' },
-  { pattern: /amazon|ebay|shop|store|mall|retail|target|macy|nordstrom|h&m|gap|zara|uniqlo/i, category: 'Food & Shopping' },
-  { pattern: /זארה|קסטרו|פוקס|רנואר|איקאה|הום סנטר|מקס סטוק|גולף|טרמינל איקס/i, category: 'Food & Shopping' },
+  { pattern: /amazon|ebay|shop|store|mall|retail|target|macy|nordstrom/i, category: 'Food & Shopping' },
+  { pattern: /איקאה|הום סנטר|מקס סטוק/i, category: 'Food & Shopping' },
 
   // ── Health (בריאות) ──
   { pattern: /gym|fitness|yoga|pilates|spa|massage|health|doctor|hospital|pharmacy|cvs|walgreens|clinic/i, category: 'Health' },
@@ -34,18 +34,29 @@ export const DEFAULT_RULES: CategorizationRule[] = [
   { pattern: /insurance|geico|progressive|state farm|allstate/i, category: 'Health' },
   { pattern: /ביטוח(?!.*רכב)(?!.*מבנה)/i, category: 'Health' },
 
-  // ── Leisure (פנאי, בילויים וביגוד) ──
-  { pattern: /starbucks|cafe|coffee|donut/i, category: 'Leisure' },
-  { pattern: /restaurant|pizza|burger|taco|diner|bistro|grill/i, category: 'Leisure' },
-  { pattern: /ארומה|קפה קפה|בית קפה|לנדוור|רולדין|מקדונלד|בורגר|פיצה|פלאפל|שווארמה|מסעד|וולט|wolt|מאפה/i, category: 'Leisure' },
-  { pattern: /netflix|spotify|hulu|disney|hbo|prime video|apple music|youtube|subscription/i, category: 'Leisure' },
-  { pattern: /movie|cinema|theater|concert|ticket|eventbrite/i, category: 'Leisure' },
-  { pattern: /סינמה|יס פלאנט|רב.?חן|הבימה|תיאטרון|הופעה|לונה פארק/i, category: 'Leisure' },
-  { pattern: /airlines|flight|airport|delta|united|southwest|ryanair|easyjet|air france/i, category: 'Leisure' },
-  { pattern: /hotel|airbnb|booking|marriott|hilton|motel/i, category: 'Leisure' },
-  { pattern: /salon|barber|haircut|cosmetics|makeup|beauty|dermalogica|sephora|ulta/i, category: 'Leisure' },
-  { pattern: /pet|vet|veterinary|dog|cat|animal|petsmart|petco/i, category: 'Leisure' },
-  { pattern: /donation|charity|gift|greeting card/i, category: 'Leisure' },
+  // ── Entertainment (פנאי ובילויים) ──
+  { pattern: /starbucks|cafe|coffee|donut/i, category: 'Entertainment' },
+  { pattern: /restaurant|pizza|burger|taco|diner|bistro|grill/i, category: 'Entertainment' },
+  { pattern: /ארומה|קפה קפה|בית קפה|לנדוור|רולדין|מקדונלד|בורגר|פיצה|פלאפל|שווארמה|מסעד|וולט|wolt|מאפה/i, category: 'Entertainment' },
+  { pattern: /movie|cinema|theater|concert|ticket|eventbrite/i, category: 'Entertainment' },
+  { pattern: /סינמה|יס פלאנט|רב.?חן|הבימה|תיאטרון|הופעה|לונה פארק/i, category: 'Entertainment' },
+  { pattern: /salon|barber|haircut|cosmetics|makeup|beauty|dermalogica|sephora|ulta/i, category: 'Entertainment' },
+  { pattern: /pet|vet|veterinary|dog|cat|animal|petsmart|petco/i, category: 'Entertainment' },
+  { pattern: /donation|charity|gift|greeting card/i, category: 'Entertainment' },
+
+  // ── Clothing & Footwear (ביגוד והנעלה) ──
+  { pattern: /h&m|gap|zara|uniqlo|nike|adidas|puma|new balance|skechers|crocs/i, category: 'Clothing & Footwear' },
+  { pattern: /זארה|קסטרו|פוקס|רנואר|גולף|טרמינל איקס|נעלי|ביגוד|אופנה|שופרא|מנגו|pull\s*&\s*bear/i, category: 'Clothing & Footwear' },
+
+  // ── Travel & Vacation (טיולים ונופש) ──
+  { pattern: /airlines|flight|airport|delta|united|southwest|ryanair|easyjet|air france|el al|wizz air|turkish/i, category: 'Travel & Vacation' },
+  { pattern: /hotel|airbnb|booking|marriott|hilton|motel|hostel|resort/i, category: 'Travel & Vacation' },
+  { pattern: /טיסה|מלון|נופש|חופש|rent.?a.?car|car rental|hertz|avis|sixt/i, category: 'Travel & Vacation' },
+
+  // ── Subscriptions (מנויים) ──
+  { pattern: /netflix|spotify|hulu|disney|hbo|prime video|apple music|youtube|subscription/i, category: 'Subscriptions' },
+  { pattern: /openai|chatgpt|claude|copilot|midjourney|notion|dropbox|icloud|google one/i, category: 'Subscriptions' },
+  { pattern: /מנוי|סטינג|cellcom tv|partner tv/i, category: 'Subscriptions' },
 
   // ── Education (חינוך וחוגים) ──
   { pattern: /daycare|school|education|tuition|kids|childcare/i, category: 'Education' },

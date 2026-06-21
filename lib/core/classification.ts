@@ -13,7 +13,10 @@ export const DEFAULT_CLASSIFICATIONS: ClassificationMap = {
   // Variable Expenses — fluctuate monthly, easier to cut
   'Food & Shopping': 'variable',
   Health: 'variable',
-  Leisure: 'variable',
+  Entertainment: 'variable',
+  'Clothing & Footwear': 'variable',
+  'Travel & Vacation': 'variable',
+  Subscriptions: 'variable',
   Education: 'variable',
 
   // Savings & Debt — allocations for the future / existing loans
