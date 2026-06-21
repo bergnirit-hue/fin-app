@@ -194,7 +194,7 @@ export default function Transactions() {
       )
     : transactions;
 
-  const filteredTransactions = [...searched].sort((a, b) => {
+  const compareTx = (a: { date: string; merchant: string; amount: number; category?: string; classification?: string; sourceType: string }, b: typeof a) => {
     let cmp = 0;
     switch (sortColumn) {
       case 'date':
@@ -217,7 +217,9 @@ export default function Transactions() {
         break;
     }
     return sortDir === 'asc' ? cmp : -cmp;
-  });
+  };
+
+  const filteredTransactions = [...searched].sort(compareTx);
 
   const toggleSort = (col: typeof sortColumn) => {
     if (sortColumn === col) {
@@ -454,7 +456,7 @@ export default function Transactions() {
 
                         {/* ── Expanded CC detail rows ── */}
                         {isExpanded &&
-                          tx.details!.map((d, idx) => (
+                          [...tx.details!].sort(compareTx).map((d) => (
                             <tr
                               key={d.id}
                               className="bg-slate-800/60 border-s-4 border-cyan-500/40"
