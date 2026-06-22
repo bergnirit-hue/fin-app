@@ -336,6 +336,64 @@ export class TransactionParser {
     return (credit ?? 0) - (debit ?? 0);
   }
 
+  /**
+   * Detect Bit export format by checking for Bit-specific headers.
+   * Returns a dedicated mapping if found, null otherwise.
+   */
+  static detectBitFormat(headers: string[]): ColumnMapping | null {
+    const joined = headers.join(' ');
+    const hasBitHeaders =
+      /סטטוס/i.test(joined) &&
+      /מאת\/ל/i.test(joined) &&
+      /זיכוי\/חיוב/i.test(joined);
+
+    if (!hasBitHeaders) return null;
+
+    const find = (re: RegExp) => headers.find((h) => re.test(h));
+
+    const dateColumn = find(/תאריך/i);
+    const merchantColumn = find(/מאת\/ל/i);
+    const amountColumn = find(/^\s*סכום\s*$/i) || find(/סכום(?!.*עמלה)/i);
+    const descriptionColumn = find(/תיאור/i);
+
+    if (!dateColumn || !merchantColumn || !amountColumn) return null;
+
+    return {
+      dateColumn,
+      merchantColumn,
+      amountColumn,
+      ...(descriptionColumn ? { descriptionColumn } : {}),
+    };
+  }
+
+  /**
+   * Filter and transform Bit export rows:
+   * - Skip non-completed rows (סורב, עבר התוקף)
+   * - Apply sign from זיכוי/חיוב column (חיוב = negative, זיכוי = positive)
+   * - Skip footer/disclaimer rows
+   */
+  static filterBitRows(data: any[]): any[] {
+    const statusCol = Object.keys(data[0] || {}).find((h) => /סטטוס/i.test(h));
+    const signCol = Object.keys(data[0] || {}).find((h) => /זיכוי\/חיוב/i.test(h));
+    const amountCol = Object.keys(data[0] || {}).find(
+      (h) => /^\s*סכום\s*$/i.test(h) || (/סכום/i.test(h) && !/עמלה/i.test(h))
+    );
+
+    return data.filter((row) => {
+      if (!statusCol) return true;
+      const status = String(row[statusCol] ?? '').trim();
+      return status === 'בוצע';
+    }).map((row) => {
+      if (!signCol || !amountCol) return row;
+      const sign = String(row[signCol] ?? '').trim();
+      const amount = parseFloat(String(row[amountCol] ?? '0').replace(/[^0-9.\-]/g, ''));
+      if (isNaN(amount)) return row;
+      // חיוב = money sent out (expense), זיכוי = money received (income)
+      const signedAmount = sign === 'זיכוי' ? amount : -amount;
+      return { ...row, [amountCol]: signedAmount };
+    });
+  }
+
   static detectColumns(data: any[]): ColumnMapping | null {
     if (!data || data.length === 0) return null;
 
@@ -357,8 +415,9 @@ export class TransactionParser {
     // "סכום עסקה" (transaction amount — the full purchase price, which can
     // differ for installment payments or discounted fees).  Fall back to the
     // generic "סכום" / "amount" pattern for bank statements and other files.
+    // Use negative lookahead to skip "סכום עמלה" (fee column in Bit exports).
     const amountColumn =
-      find(/סכום.?חיוב/i) || find(/amount|סכום|transaction amount/i);
+      find(/סכום.?חיוב/i) || find(/סכום(?!.*עמלה)/i) || find(/amount|transaction amount/i);
 
     // When "סכום חיוב" is selected, it's always positive — even for
     // refunds.  "סכום עסקה" carries the correct sign (negative = credit),

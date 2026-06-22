@@ -1,10 +1,13 @@
 /**
- * Cross-reference payment-service exports (Bit, PayPal) with bank statement
+ * Cross-reference payment-service exports (Bit, PayPal) with bank/CC
  * transactions already in the database.
  *
- * When a user uploads a Bit/PayPal file, bank entries like "Bit Payment" or
- * "PayPal" are enriched with the real recipient name from the payment-service
- * export.  Matching is done on date (±1 day) + amount (±0.01).
+ * When a user uploads a Bit/PayPal file:
+ *  • Bank entries like "Bit Payment" are enriched with the real recipient.
+ *  • CC detail entries like "העברה בBIT" are enriched with the payment
+ *    description from the service export (e.g. "העברת ביט - טיפול 10").
+ *
+ * Matching is done on date (±1 day) + amount (±0.01).
  */
 
 import { isPaymentServiceProxy } from './deduplication';
@@ -14,12 +17,14 @@ export interface CrossRefCandidate {
   date: Date;
   amount: number;
   merchant: string;
+  description?: string;
+  sourceType?: string;
 }
 
 export interface CrossRefMatch {
-  bankTransactionId: string;
-  newMerchant: string;
-  newDescription: string | undefined;
+  targetTransactionId: string;
+  psMerchant: string;
+  psDescription: string | undefined;
   confidence: number;
 }
 
@@ -29,55 +34,49 @@ export interface CrossRefResult {
 }
 
 /**
- * Match newly-uploaded payment-service transactions against existing bank
- * "proxy" rows (e.g. "Bit Payment", "PayPal") in the database.
- *
- * @param bankProxies     Bank transactions whose merchant matches a payment
- *                        service keyword and haven't been enriched yet.
- * @param psTransactions  Newly-uploaded payment-service transactions.
- * @param serviceKeyword  The payment service to match (e.g. "bit", "paypal").
+ * Match newly-uploaded payment-service transactions against existing
+ * proxy rows (bank "Bit Payment" or CC "העברה בBIT") in the database.
  */
 export function crossReference(
-  bankProxies: CrossRefCandidate[],
+  existingProxies: CrossRefCandidate[],
   psTransactions: CrossRefCandidate[],
   serviceKeyword: string
 ): CrossRefResult {
   const matched: CrossRefMatch[] = [];
-  const usedBankIds = new Set<string>();
+  const usedTargetIds = new Set<string>();
   const usedPsIds = new Set<string>();
 
-  const relevantProxies = bankProxies.filter((bp) =>
+  const relevantProxies = existingProxies.filter((bp) =>
     bp.merchant.toLowerCase().includes(serviceKeyword.toLowerCase())
   );
 
-  // Score all possible pairs, then greedily pick the best matches.
   const pairs: Array<{
-    bank: CrossRefCandidate;
+    target: CrossRefCandidate;
     ps: CrossRefCandidate;
     score: number;
   }> = [];
 
-  for (const bp of relevantProxies) {
+  for (const target of relevantProxies) {
     for (const ps of psTransactions) {
-      const score = matchScore(bp, ps);
+      const score = matchScore(target, ps);
       if (score > 0) {
-        pairs.push({ bank: bp, ps, score });
+        pairs.push({ target, ps, score });
       }
     }
   }
 
   pairs.sort((a, b) => b.score - a.score);
 
-  for (const { bank, ps, score } of pairs) {
-    if (usedBankIds.has(bank.id) || usedPsIds.has(ps.id)) continue;
+  for (const { target, ps, score } of pairs) {
+    if (usedTargetIds.has(target.id) || usedPsIds.has(ps.id)) continue;
 
     matched.push({
-      bankTransactionId: bank.id,
-      newMerchant: ps.merchant,
-      newDescription: `${serviceKeyword} → ${ps.merchant}`,
+      targetTransactionId: target.id,
+      psMerchant: ps.merchant,
+      psDescription: ps.description,
       confidence: score,
     });
-    usedBankIds.add(bank.id);
+    usedTargetIds.add(target.id);
     usedPsIds.add(ps.id);
   }
 

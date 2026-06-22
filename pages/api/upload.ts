@@ -78,10 +78,22 @@ export default async function handler(
     if (ext.endsWith('.csv')) {
       // Use the provided mapping, or auto-detect from the CSV headers.
       let mapping = columnMapping;
+      let rawRows: any[] | null = null;
       if (!mapping) {
-        const rows = await TransactionParser.readRawRows(buffer);
-        fileHeaders = rows[0] ? Object.keys(rows[0]) : [];
-        mapping = TransactionParser.detectColumns(rows);
+        rawRows = await TransactionParser.readRawRows(buffer);
+        fileHeaders = rawRows[0] ? Object.keys(rawRows[0]) : [];
+
+        // Try Bit-specific format first
+        const bitMapping = TransactionParser.detectBitFormat(fileHeaders);
+        if (bitMapping) {
+          mapping = bitMapping;
+          sourceType = 'bit';
+          rawRows = TransactionParser.filterBitRows(rawRows);
+          console.log(`Upload: detected Bit format, ${rawRows.length} rows after status filter`);
+        } else {
+          mapping = TransactionParser.detectColumns(rawRows);
+        }
+
         if (!mapping) {
           console.error('Upload: column detection failed. Headers:', fileHeaders);
           return res.status(400).json({
@@ -100,11 +112,28 @@ export default async function handler(
         console.log('Upload: auto-detected credit-card file from headers');
       }
 
-      parseResult = await TransactionParser.parseCSV(
-        buffer,
-        mapping,
-        sourceType
-      );
+      // For Bit files we already have filtered rows; parse them directly.
+      if (rawRows && sourceType === 'bit') {
+        const transactions = rawRows
+          .map((row: any) => {
+            const date = (TransactionParser as any).parseDate(row[mapping!.dateColumn]);
+            const amount = (TransactionParser as any).parseAmount(row[mapping!.amountColumn!]);
+            if (!date || amount === null) return null;
+            const merchant = String(row[mapping!.merchantColumn] ?? '').trim();
+            const description = mapping!.descriptionColumn
+              ? String(row[mapping!.descriptionColumn] ?? '').trim() || undefined
+              : undefined;
+            return { date, amount, merchant, description, sourceType: 'bit' };
+          })
+          .filter((t: any): t is NonNullable<typeof t> => t !== null);
+        parseResult = { transactions, columnMapping: mapping };
+      } else {
+        parseResult = await TransactionParser.parseCSV(
+          buffer,
+          mapping,
+          sourceType
+        );
+      }
     } else if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
       // Use the provided mapping, or auto-detect from the Excel headers.
       // Israeli bank exports often have title/summary rows above the real
@@ -332,20 +361,24 @@ export default async function handler(
       }
     }
 
-    // ── Payment-service ↔ bank cross-referencing ─────────────────
+    // ── Payment-service cross-referencing ──────────────────────────
     // When a Bit/PayPal/etc. file is uploaded, find existing bank
-    // transactions that are payment-service proxies (e.g. "Bit Payment")
-    // and enrich them with the real recipient name from this file.
+    // proxies (e.g. "Bit Payment") AND CC detail rows (e.g. "העברה בBIT")
+    // and enrich them with data from the payment-service export.
     let crossRefCount = 0;
     const paymentService = detectPaymentService(sourceType, filename);
     if (paymentService && toInsert.length > 0) {
-      const bankProxies = await prisma.transaction.findMany({
+      // Query both bank proxy rows and CC detail rows that mention the service
+      const existingProxies = await prisma.transaction.findMany({
         where: {
           userId: auth.userId,
-          sourceType: 'bank',
           uploadId: { not: upload.id },
+          OR: [
+            { sourceType: 'bank' },
+            { sourceType: 'credit_card' },
+          ],
         },
-        select: { id: true, date: true, amount: true, merchant: true },
+        select: { id: true, date: true, amount: true, merchant: true, sourceType: true },
       });
 
       const psTransactions = toInsert.map((tx, i) => ({
@@ -353,35 +386,53 @@ export default async function handler(
         date: tx.date,
         amount: tx.amount,
         merchant: tx.merchant,
+        description: tx.description,
       }));
 
-      const xref = crossReference(bankProxies, psTransactions, paymentService);
+      const xref = crossReference(existingProxies, psTransactions, paymentService);
+
+      // Build a lookup of target sourceTypes for formatting
+      const sourceTypeMap = new Map(
+        existingProxies.map((t) => [t.id, t.sourceType])
+      );
 
       for (const match of xref.matched) {
+        const targetSourceType = sourceTypeMap.get(match.targetTransactionId);
+        let newMerchant: string;
+        let newDescription: string | undefined;
+
+        if (targetSourceType === 'credit_card') {
+          // CC detail row: "העברה בBIT" → "העברת ביט - טיפול 10"
+          const label = match.psDescription || match.psMerchant;
+          newMerchant = `העברת ביט - ${label}`;
+          newDescription = match.psMerchant;
+        } else {
+          // Bank proxy row: "Bit Payment" → real merchant name
+          newMerchant = match.psMerchant;
+          newDescription = `${paymentService} → ${match.psMerchant}`;
+        }
+
         await prisma.transaction.update({
-          where: { id: match.bankTransactionId },
-          data: {
-            merchant: match.newMerchant,
-            description: match.newDescription,
-          },
+          where: { id: match.targetTransactionId },
+          data: { merchant: newMerchant, description: newDescription },
         });
       }
 
       crossRefCount = xref.matched.length;
       if (crossRefCount > 0) {
         console.log(
-          `Upload: cross-referenced ${crossRefCount} bank "${paymentService}" entries with real recipients`
+          `Upload: cross-referenced ${crossRefCount} "${paymentService}" entries with real recipients`
         );
       }
       if (xref.unmatched.length > 0) {
         console.log(
-          `Upload: ${xref.unmatched.length} ${paymentService} transactions had no matching bank entry`
+          `Upload: ${xref.unmatched.length} ${paymentService} transactions had no matching bank/CC entry`
         );
       }
     }
 
     const enrichMsg = crossRefCount > 0
-      ? ` (${crossRefCount} bank entries enriched)`
+      ? ` (${crossRefCount} entries enriched via ${paymentService})`
       : '';
 
     return res.status(200).json({
