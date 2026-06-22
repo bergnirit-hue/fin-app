@@ -123,7 +123,8 @@ export default async function handler(
             const description = mapping!.descriptionColumn
               ? String(row[mapping!.descriptionColumn] ?? '').trim() || undefined
               : undefined;
-            return { date, amount, merchant, description, sourceType: 'bit' };
+            const paymentMethod: string | undefined = row.__paymentMethod || undefined;
+            return { date, amount, merchant, description, sourceType: 'bit', paymentMethod };
           })
           .filter((t: any): t is NonNullable<typeof t> => t !== null);
         parseResult = { transactions, columnMapping: mapping };
@@ -277,19 +278,50 @@ export default async function handler(
       toInsert.push(tx);
     }
 
-    // Record the upload, then persist the new transactions linked to it.
+    // ── Payment-service: split CC-paid from standalone ─────────────
+    // Bit/PayPal transactions paid via credit card are the SAME charge
+    // that appears in a CC statement.  To avoid double-counting:
+    //  • CC-paid rows are used to enrich existing CC detail rows, then
+    //    discarded (not saved as standalone transactions).
+    //  • If no matching CC detail exists yet, they're saved as hidden
+    //    (isDuplicate=true) so a future CC upload can auto-match them.
+    //  • Balance / bank-account rows are genuine standalone expenses.
+    const paymentService = detectPaymentService(sourceType, filename);
+    const CC_PAYMENT_METHODS = ['כרטיס אשראי', 'credit card'];
+
+    let ccPaidRows: typeof classified = [];
+    let standaloneTx: typeof classified;
+
+    if (paymentService) {
+      standaloneTx = [];
+      for (const tx of toInsert) {
+        const pm = (tx as any).paymentMethod?.toLowerCase() ?? '';
+        if (CC_PAYMENT_METHODS.some((m) => pm.includes(m))) {
+          ccPaidRows.push(tx);
+        } else {
+          standaloneTx.push(tx);
+        }
+      }
+      console.log(
+        `Upload: ${paymentService} — ${standaloneTx.length} standalone, ${ccPaidRows.length} CC-paid`
+      );
+    } else {
+      standaloneTx = toInsert;
+    }
+
+    // Record the upload, then persist standalone transactions.
     const upload = await prisma.upload.create({
       data: {
         userId: auth.userId,
         fileName: filename,
         sourceType,
-        transactionCount: toInsert.length,
+        transactionCount: standaloneTx.length + ccPaidRows.length,
       },
     });
 
-    if (toInsert.length > 0) {
+    if (standaloneTx.length > 0) {
       await prisma.transaction.createMany({
-        data: toInsert.map((tx) => ({
+        data: standaloneTx.map((tx) => ({
           userId: auth.userId,
           uploadId: upload.id,
           date: tx.date,
@@ -304,18 +336,8 @@ export default async function handler(
     }
 
     // ── Credit-card ↔ bank reconciliation ──────────────────────────
-    // When a credit-card detail file is uploaded, try to match it to an
-    // existing bank-statement lump-sum (e.g. "ישראכרט −₪5 000").  If
-    // found, link the CC details to that bank row so they show as an
-    // expandable drill-down and are excluded from summary totals.
     let linkedParentId: string | null = null;
     if (sourceType === 'credit_card' && toInsert.length > 0) {
-      // Prefer the billing total extracted from the file header
-      // (e.g. "₪ 4,088.58") — this is the amount the bank actually debits.
-      // The sum of all transactions in the file can be much larger because
-      // CC files include installment payments from previous billing cycles.
-      // Fall back to the net sum only when no header total was found (CSV
-      // files, or non-standard Excel layouts).
       const ccTotal = billingTotal ?? Math.abs(
         toInsert.reduce((sum, tx) => sum + tx.amount, 0)
       );
@@ -329,7 +351,6 @@ export default async function handler(
         toInsert[0].date
       );
 
-      // Fetch unlinked negative bank transactions for this user.
       const bankCandidates = await prisma.transaction.findMany({
         where: {
           userId: auth.userId,
@@ -345,8 +366,6 @@ export default async function handler(
           where: { uploadId: upload.id },
           data: { linkedToId: match.id },
         });
-        // Store the card label on the parent bank entry so the UI can
-        // display it as a tag (e.g. "כרטיס 5560 ע״ש נירית ברג").
         if (cardLabel) {
           await prisma.transaction.update({
             where: { id: match.id },
@@ -361,14 +380,12 @@ export default async function handler(
       }
     }
 
-    // ── Payment-service cross-referencing ──────────────────────────
-    // When a Bit/PayPal/etc. file is uploaded, find existing bank
-    // proxies (e.g. "Bit Payment") AND CC detail rows (e.g. "העברה בBIT")
-    // and enrich them with data from the payment-service export.
+    // ── Payment-service → CC cross-referencing ──────────────────────
+    // Enrich existing CC detail rows with data from the payment-service
+    // file.  CC-paid PS rows that don't match are saved as hidden
+    // (isDuplicate=true) for future reverse cross-referencing.
     let crossRefCount = 0;
-    const paymentService = detectPaymentService(sourceType, filename);
-    if (paymentService && toInsert.length > 0) {
-      // Query both bank proxy rows and CC detail rows that mention the service
+    if (paymentService && ccPaidRows.length > 0) {
       const existingProxies = await prisma.transaction.findMany({
         where: {
           userId: auth.userId,
@@ -381,7 +398,7 @@ export default async function handler(
         select: { id: true, date: true, amount: true, merchant: true, sourceType: true },
       });
 
-      const psTransactions = toInsert.map((tx, i) => ({
+      const psTransactions = ccPaidRows.map((tx, i) => ({
         id: String(i),
         date: tx.date,
         amount: tx.amount,
@@ -391,59 +408,156 @@ export default async function handler(
 
       const xref = crossReference(existingProxies, psTransactions, paymentService);
 
-      // Build a lookup of target sourceTypes for formatting
       const sourceTypeMap = new Map(
         existingProxies.map((t) => [t.id, t.sourceType])
       );
 
       for (const match of xref.matched) {
         const targetSourceType = sourceTypeMap.get(match.targetTransactionId);
-        let newMerchant: string;
-        let newDescription: string | undefined;
+        const desc = match.psDescription || match.psMerchant;
+        const label = match.psDescription
+          ? `${paymentService}: ${match.psDescription} - ${match.psMerchant}`
+          : `${paymentService}: ${match.psMerchant}`;
 
         if (targetSourceType === 'credit_card') {
-          // CC detail row: "העברה בBIT" → "העברת ביט - טיפול 10"
-          const label = match.psDescription || match.psMerchant;
-          newMerchant = `העברת ביט - ${label}`;
-          newDescription = match.psMerchant;
+          await prisma.transaction.update({
+            where: { id: match.targetTransactionId },
+            data: { merchant: label, sourceType: paymentService, description: desc },
+          });
         } else {
-          // Bank proxy row: "Bit Payment" → real merchant name
-          newMerchant = match.psMerchant;
-          newDescription = `${paymentService} → ${match.psMerchant}`;
+          await prisma.transaction.update({
+            where: { id: match.targetTransactionId },
+            data: {
+              merchant: match.psMerchant,
+              description: `${paymentService} → ${match.psMerchant}`,
+            },
+          });
         }
-
-        await prisma.transaction.update({
-          where: { id: match.targetTransactionId },
-          data: { merchant: newMerchant, description: newDescription },
-        });
       }
 
       crossRefCount = xref.matched.length;
-      if (crossRefCount > 0) {
+
+      // Save unmatched CC-paid rows as hidden (isDuplicate=true) —
+      // they'll be auto-matched when the CC statement is uploaded.
+      const unmatchedCcPaid = xref.unmatched.map((u) => ccPaidRows[parseInt(u.id)]);
+      if (unmatchedCcPaid.length > 0) {
+        await prisma.transaction.createMany({
+          data: unmatchedCcPaid.map((tx) => ({
+            userId: auth.userId,
+            uploadId: upload.id,
+            date: tx.date,
+            amount: tx.amount,
+            merchant: tx.merchant,
+            description: tx.description ?? null,
+            category: tx.category,
+            classification: tx.classification,
+            sourceType: tx.sourceType,
+            isDuplicate: true,
+          })),
+        });
         console.log(
-          `Upload: cross-referenced ${crossRefCount} "${paymentService}" entries with real recipients`
+          `Upload: ${unmatchedCcPaid.length} CC-paid ${paymentService} rows saved as hidden (pending CC match)`
         );
       }
-      if (xref.unmatched.length > 0) {
+
+      if (crossRefCount > 0) {
         console.log(
-          `Upload: ${xref.unmatched.length} ${paymentService} transactions had no matching bank/CC entry`
+          `Upload: cross-referenced ${crossRefCount} "${paymentService}" CC entries`
         );
+      }
+    }
+
+    // ── Reverse cross-ref: CC upload → pending PS rows ──────────────
+    // When a CC statement is uploaded, check for hidden payment-service
+    // rows (isDuplicate=true) that can now be matched to the new CC
+    // detail rows, and enrich them automatically.
+    let reverseCrossRefCount = 0;
+    if (sourceType === 'credit_card' && toInsert.length > 0) {
+      const pendingPsRows = await prisma.transaction.findMany({
+        where: {
+          userId: auth.userId,
+          isDuplicate: true,
+          sourceType: { in: ['bit', 'paypal', 'paybox'] },
+        },
+        select: { id: true, date: true, amount: true, merchant: true, description: true, sourceType: true },
+      });
+
+      if (pendingPsRows.length > 0) {
+        // Newly saved CC rows — these are the targets to enrich.
+        const newCcRows = await prisma.transaction.findMany({
+          where: { uploadId: upload.id },
+          select: { id: true, date: true, amount: true, merchant: true, sourceType: true },
+        });
+
+        // Group pending PS rows by service for separate cross-ref passes.
+        const serviceGroups = new Map<string, typeof pendingPsRows>();
+        for (const row of pendingPsRows) {
+          const svc = row.sourceType;
+          if (!serviceGroups.has(svc)) serviceGroups.set(svc, []);
+          serviceGroups.get(svc)!.push(row);
+        }
+
+        for (const [svc, psRows] of serviceGroups) {
+          // newCcRows = targets (contain "bit"/"paypal" in merchant)
+          // psRows = sources (provide real merchant/description)
+          const psCandidates = psRows.map((r) => ({
+            ...r,
+            description: r.description ?? undefined,
+          }));
+          const xref = crossReference(newCcRows, psCandidates, svc);
+
+          for (const match of xref.matched) {
+            // match.targetTransactionId = the CC row to enrich
+            // match.psMerchant / psDescription = from the pending Bit row
+            const label = match.psDescription
+              ? `${svc}: ${match.psDescription} - ${match.psMerchant}`
+              : `${svc}: ${match.psMerchant}`;
+
+            await prisma.transaction.update({
+              where: { id: match.targetTransactionId },
+              data: { merchant: label, sourceType: svc, description: match.psDescription || match.psMerchant },
+            });
+          }
+
+          // Delete the matched pending PS rows — their data has been
+          // transferred to the CC detail rows.
+          const unmatchedPsIdSet = new Set(xref.unmatched.map((u) => u.id));
+          const matchedPsRowIds = psRows
+            .filter((r) => !unmatchedPsIdSet.has(r.id))
+            .map((r) => r.id);
+
+          if (matchedPsRowIds.length > 0) {
+            await prisma.transaction.deleteMany({
+              where: { id: { in: matchedPsRowIds } },
+            });
+          }
+
+          reverseCrossRefCount += xref.matched.length;
+          if (xref.matched.length > 0) {
+            console.log(
+              `Upload: reverse cross-ref — enriched ${xref.matched.length} CC rows from pending ${svc} data`
+            );
+          }
+        }
       }
     }
 
     const enrichMsg = crossRefCount > 0
       ? ` (${crossRefCount} entries enriched via ${paymentService})`
-      : '';
+      : reverseCrossRefCount > 0
+        ? ` (${reverseCrossRefCount} entries enriched via pending cross-ref)`
+        : '';
 
+    const savedCount = standaloneTx.length;
     return res.status(200).json({
       success: true,
       message:
         duplicateCount > 0
-          ? `Saved ${toInsert.length} transactions (${duplicateCount} duplicates skipped)${enrichMsg}`
-          : `Saved ${toInsert.length} transactions${enrichMsg}`,
+          ? `Saved ${savedCount} transactions (${duplicateCount} duplicates skipped)${enrichMsg}`
+          : `Saved ${savedCount} transactions${enrichMsg}`,
       transactions: classified,
       transactionCount: classified.length,
-      savedCount: toInsert.length,
+      savedCount,
       duplicateCount,
       uploadId: upload.id,
     });

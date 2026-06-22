@@ -22,6 +22,7 @@ export interface ParsedTransaction {
   merchant: string;
   description?: string;
   sourceType: string;
+  paymentMethod?: string;
 }
 
 export interface ParseResult {
@@ -378,19 +379,27 @@ export class TransactionParser {
     const amountCol = Object.keys(data[0] || {}).find(
       (h) => /^\s*סכום\s*$/i.test(h) || (/סכום/i.test(h) && !/עמלה/i.test(h))
     );
+    const payMethodCol = Object.keys(data[0] || {}).find((h) => /אמצעי\s*תשלום/i.test(h));
 
     return data.filter((row) => {
       if (!statusCol) return true;
       const status = String(row[statusCol] ?? '').trim();
       return status === 'בוצע';
     }).map((row) => {
-      if (!signCol || !amountCol) return row;
-      const sign = String(row[signCol] ?? '').trim();
-      const amount = parseFloat(String(row[amountCol] ?? '0').replace(/[^0-9.\-]/g, ''));
-      if (isNaN(amount)) return row;
-      // חיוב = money sent out (expense), זיכוי = money received (income)
-      const signedAmount = sign === 'זיכוי' ? amount : -amount;
-      return { ...row, [amountCol]: signedAmount };
+      const patched = { ...row };
+      if (signCol && amountCol) {
+        const sign = String(row[signCol] ?? '').trim();
+        const amount = parseFloat(String(row[amountCol] ?? '0').replace(/[^0-9.\-]/g, ''));
+        if (!isNaN(amount)) {
+          patched[amountCol] = sign === 'זיכוי' ? amount : -amount;
+        }
+      }
+      // Normalise the payment method into a dedicated key so callers
+      // don't need to locate the Hebrew column themselves.
+      if (payMethodCol) {
+        patched.__paymentMethod = String(row[payMethodCol] ?? '').trim();
+      }
+      return patched;
     });
   }
 

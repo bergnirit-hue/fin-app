@@ -49,7 +49,7 @@ export default async function handler(
   }
 
   const rows = await prisma.transaction.findMany({
-    where: { userId: auth.userId },
+    where: { userId: auth.userId, isDuplicate: false, linkedToId: null },
     orderBy: { date: 'asc' },
   });
 

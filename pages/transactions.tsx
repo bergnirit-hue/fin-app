@@ -522,7 +522,7 @@ export default function Transactions() {
                                 <ClassificationBadge classification={d.classification} t={t} small />
                               </td>
                               <td className="px-6 py-3 text-slate-500 text-xs">
-                                💳
+                                {sourceLabel(d.sourceType)}
                               </td>
                             </tr>
                           ))}
