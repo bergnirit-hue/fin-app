@@ -9,6 +9,7 @@ import { DeduplicationEngine } from '@/lib/core/deduplication';
 import { CategorizationEngine } from '@/lib/core/categorization';
 import { ClassificationEngine, ClassificationType } from '@/lib/core/classification';
 import { findMatchingBankEntry, looksLikeCreditCardFile } from '@/lib/core/reconciliation';
+import { crossReference, detectPaymentService } from '@/lib/core/cross-reference';
 
 interface UploadResponse {
   success: boolean;
@@ -331,12 +332,64 @@ export default async function handler(
       }
     }
 
+    // ── Payment-service ↔ bank cross-referencing ─────────────────
+    // When a Bit/PayPal/etc. file is uploaded, find existing bank
+    // transactions that are payment-service proxies (e.g. "Bit Payment")
+    // and enrich them with the real recipient name from this file.
+    let crossRefCount = 0;
+    const paymentService = detectPaymentService(sourceType, filename);
+    if (paymentService && toInsert.length > 0) {
+      const bankProxies = await prisma.transaction.findMany({
+        where: {
+          userId: auth.userId,
+          sourceType: 'bank',
+          uploadId: { not: upload.id },
+        },
+        select: { id: true, date: true, amount: true, merchant: true },
+      });
+
+      const psTransactions = toInsert.map((tx, i) => ({
+        id: String(i),
+        date: tx.date,
+        amount: tx.amount,
+        merchant: tx.merchant,
+      }));
+
+      const xref = crossReference(bankProxies, psTransactions, paymentService);
+
+      for (const match of xref.matched) {
+        await prisma.transaction.update({
+          where: { id: match.bankTransactionId },
+          data: {
+            merchant: match.newMerchant,
+            description: match.newDescription,
+          },
+        });
+      }
+
+      crossRefCount = xref.matched.length;
+      if (crossRefCount > 0) {
+        console.log(
+          `Upload: cross-referenced ${crossRefCount} bank "${paymentService}" entries with real recipients`
+        );
+      }
+      if (xref.unmatched.length > 0) {
+        console.log(
+          `Upload: ${xref.unmatched.length} ${paymentService} transactions had no matching bank entry`
+        );
+      }
+    }
+
+    const enrichMsg = crossRefCount > 0
+      ? ` (${crossRefCount} bank entries enriched)`
+      : '';
+
     return res.status(200).json({
       success: true,
       message:
         duplicateCount > 0
-          ? `Saved ${toInsert.length} transactions (${duplicateCount} duplicates skipped)`
-          : `Saved ${toInsert.length} transactions`,
+          ? `Saved ${toInsert.length} transactions (${duplicateCount} duplicates skipped)${enrichMsg}`
+          : `Saved ${toInsert.length} transactions${enrichMsg}`,
       transactions: classified,
       transactionCount: classified.length,
       savedCount: toInsert.length,
