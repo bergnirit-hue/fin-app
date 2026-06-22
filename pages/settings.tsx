@@ -30,6 +30,10 @@ export default function Settings() {
   const [showAddRuleModal, setShowAddRuleModal] = useState(false);
   const [newRuleMerchant, setNewRuleMerchant] = useState('');
   const [newRuleCategory, setNewRuleCategory] = useState('');
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);
+  const [categoryFormName, setCategoryFormName] = useState('');
+  const [categoryFormClassification, setCategoryFormClassification] = useState('variable');
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -80,6 +84,61 @@ export default function Settings() {
     if (activeTab === 'categories') loadCategories();
     if (activeTab === 'rules') loadRules();
   }, [activeTab, loadCategories, loadRules]);
+
+  const openAddCategory = () => {
+    setEditingCategory(null);
+    setCategoryFormName('');
+    setCategoryFormClassification('variable');
+    setShowCategoryModal(true);
+  };
+
+  const openEditCategory = (cat: CategoryItem) => {
+    setEditingCategory(cat);
+    setCategoryFormName(cat.name);
+    setCategoryFormClassification(cat.classification);
+    setShowCategoryModal(true);
+  };
+
+  const handleSaveCategory = async () => {
+    const name = categoryFormName.trim();
+    if (!name || !categoryFormClassification) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      if (editingCategory?.isCustom && editingCategory.id) {
+        const res = await fetch(`/api/categories/${editingCategory.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ name, classification: categoryFormClassification }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCategories((prev) =>
+            prev.map((c) => (c.id === editingCategory.id ? data.category : c))
+          );
+        }
+      } else {
+        const res = await fetch('/api/categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ name, classification: categoryFormClassification }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCategories((prev) => {
+            const filtered = prev.filter((c) => c.name !== name);
+            return [...filtered, data.category].sort((a, b) => a.name.localeCompare(b.name));
+          });
+        }
+      }
+    } catch {}
+
+    setShowCategoryModal(false);
+    setCategoryFormName('');
+    setCategoryFormClassification('variable');
+    setEditingCategory(null);
+  };
 
   const handleDeleteCategory = async (id: string) => {
     const token = localStorage.getItem('token');
@@ -328,19 +387,99 @@ export default function Settings() {
                               </p>
                             </div>
                           </div>
-                          {cat.isCustom && cat.id && (
+                          <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleDeleteCategory(cat.id!)}
-                              className="text-slate-400 hover:text-rose-400 transition opacity-0 group-hover:opacity-100 text-xl"
-                              title={t('settings.deleteCategory')}
+                              onClick={() => openEditCategory(cat)}
+                              className="text-slate-400 hover:text-cyan-400 transition opacity-0 group-hover:opacity-100 text-lg"
+                              title={t('settings.editCategory')}
                             >
-                              ✕
+                              ✎
                             </button>
-                          )}
+                            {cat.isCustom && cat.id && (
+                              <button
+                                onClick={() => handleDeleteCategory(cat.id!)}
+                                className="text-slate-400 hover:text-rose-400 transition opacity-0 group-hover:opacity-100 text-xl"
+                                title={t('settings.deleteCategory')}
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
                         </div>
                       );
                     })
                   )}
+                </div>
+
+                <button
+                  onClick={openAddCategory}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105 mt-4"
+                >
+                  <span dir="ltr">➕ {t('settings.addCategory')}</span>
+                </button>
+              </div>
+            )}
+
+            {/* Category Add/Edit Modal */}
+            {showCategoryModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                <div className="bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-600/50 rounded-2xl p-8 shadow-2xl w-full max-w-md mx-4">
+                  <h3 className="text-2xl font-bold text-white mb-6">
+                    {editingCategory ? t('settings.editCategoryTitle') : t('settings.addCategoryTitle')}
+                  </h3>
+
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-300 mb-2">
+                        {t('settings.categoryName')}
+                      </label>
+                      <input
+                        type="text"
+                        autoFocus
+                        value={categoryFormName}
+                        onChange={(e) => setCategoryFormName(e.target.value)}
+                        placeholder={t('settings.categoryName')}
+                        className="w-full px-5 py-3 bg-slate-600/50 border border-slate-500/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-300 mb-2">
+                        {t('settings.categoryType')}
+                      </label>
+                      <select
+                        value={categoryFormClassification}
+                        onChange={(e) => setCategoryFormClassification(e.target.value)}
+                        className="w-full px-5 py-3 bg-slate-600/50 border border-slate-500/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition [color-scheme:dark]"
+                      >
+                        <option value="fixed">{t('transactions.fixed')}</option>
+                        <option value="variable">{t('transactions.variable')}</option>
+                        <option value="savings_debt">{t('transactions.savingsDebt')}</option>
+                        <option value="income">{t('transactions.income')}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-8">
+                    <button
+                      onClick={handleSaveCategory}
+                      disabled={!categoryFormName.trim()}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all transform hover:scale-105"
+                    >
+                      <span dir="ltr">💾 {t('settings.saveCategory')}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowCategoryModal(false);
+                        setCategoryFormName('');
+                        setCategoryFormClassification('variable');
+                        setEditingCategory(null);
+                      }}
+                      className="flex-1 px-6 py-3 bg-slate-600/50 hover:bg-slate-500/50 text-slate-300 rounded-xl font-semibold transition-all"
+                    >
+                      {t('settings.cancelCategory')}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
