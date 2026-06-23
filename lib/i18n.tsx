@@ -76,6 +76,11 @@ const en: Dict = {
     ctaSub:
       'Upload transactions from multiple sources to get a complete picture of your finances',
     uploadNew: 'Upload New File',
+    periodLastMonth: 'Last month',
+    periodLast3: '3 months',
+    periodLast6: '6 months',
+    periodLastYear: 'Year',
+    periodAll: 'All time',
   },
   upload: {
     title: 'Upload Transactions',
@@ -287,6 +292,11 @@ const he: Dict = {
     ctaTitle: 'מוכן להוסיף עוד נתונים?',
     ctaSub: 'העלה עסקאות ממקורות שונים כדי לקבל תמונה מלאה של הכספים שלך',
     uploadNew: 'העלאת קובץ חדש',
+    periodLastMonth: 'חודש אחרון',
+    periodLast3: '3 חודשים',
+    periodLast6: '6 חודשים',
+    periodLastYear: 'שנה',
+    periodAll: 'הכל',
   },
   upload: {
     title: 'העלאת עסקאות',

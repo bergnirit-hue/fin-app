@@ -15,6 +15,20 @@ interface DashboardMetrics {
   byCategory: { [key: string]: number };
 }
 
+type PeriodKey = '1m' | '3m' | '6m' | '1y' | 'all';
+
+function periodRange(key: PeriodKey): { from?: string; to?: string } {
+  if (key === 'all') return {};
+  const now = new Date();
+  const to = now.toISOString();
+  const from = new Date(now);
+  if (key === '1m') from.setMonth(from.getMonth() - 1);
+  else if (key === '3m') from.setMonth(from.getMonth() - 3);
+  else if (key === '6m') from.setMonth(from.getMonth() - 6);
+  else if (key === '1y') from.setFullYear(from.getFullYear() - 1);
+  return { from: from.toISOString(), to };
+}
+
 // Color system from Figma design
 const colors = {
   emerald: '#0bbf94',
@@ -24,11 +38,20 @@ const colors = {
   amber: '#fdb022',
 };
 
+const PERIOD_I18N: Record<PeriodKey, string> = {
+  '1m': 'dashboard.periodLastMonth',
+  '3m': 'dashboard.periodLast3',
+  '6m': 'dashboard.periodLast6',
+  '1y': 'dashboard.periodLastYear',
+  all: 'dashboard.periodAll',
+};
+
 export default function Dashboard() {
   const router = useRouter();
   const { t, formatMoney } = useI18n();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState<PeriodKey>('1m');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -37,9 +60,16 @@ export default function Dashboard() {
       return;
     }
 
+    setLoading(true);
     (async () => {
       try {
-        const res = await fetch('/api/dashboard', {
+        const range = periodRange(period);
+        const params = new URLSearchParams();
+        if (range.from) params.set('from', range.from);
+        if (range.to) params.set('to', range.to);
+        const qs = params.toString();
+
+        const res = await fetch(`/api/dashboard${qs ? `?${qs}` : ''}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -72,7 +102,7 @@ export default function Dashboard() {
         setLoading(false);
       }
     })();
-  }, [router]);
+  }, [router, period]);
 
   if (loading) {
     return (
@@ -116,11 +146,34 @@ export default function Dashboard() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
         {/* Header with gradient */}
-        <div className="mb-8">
-          <h1 className="text-5xl font-black mb-2 bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
-            {t('dashboard.title')}
-          </h1>
-          <p className="text-slate-400 text-lg">{t('dashboard.subtitle')}</p>
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <h1 className="text-5xl font-black mb-2 bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
+              {t('dashboard.title')}
+            </h1>
+            <p className="text-slate-400 text-lg">{t('dashboard.subtitle')}</p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {([
+              ['1m', t('dashboard.periodLastMonth')],
+              ['3m', t('dashboard.periodLast3')],
+              ['6m', t('dashboard.periodLast6')],
+              ['1y', t('dashboard.periodLastYear')],
+              ['all', t('dashboard.periodAll')],
+            ] as [PeriodKey, string][]).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setPeriod(key)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  period === key
+                    ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/50'
+                    : 'bg-slate-700/50 text-slate-400 border border-slate-600/50 hover:bg-slate-600/50 hover:text-slate-300'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Key Metrics Grid - 4 Cards with Different Colors */}
@@ -154,7 +207,7 @@ export default function Dashboard() {
           <MetricCard
             title={t('dashboard.savingsRate')}
             value={`${metrics.savingsPercentage.toFixed(1)}%`}
-            change={t('dashboard.thisMonth')}
+            change={t(PERIOD_I18N[period])}
             icon="📈"
             color="violet"
             accentColor="from-violet-600/20 to-violet-600/5 border-violet-500/30"
@@ -169,7 +222,9 @@ export default function Dashboard() {
               <h2 className="text-2xl font-bold text-white">
                 📊 {t('dashboard.topCategories')}
               </h2>
-              <div className="text-sm text-slate-400">{t('dashboard.last30')}</div>
+              <div className="text-sm text-slate-400">
+                {t(PERIOD_I18N[period])}
+              </div>
             </div>
 
             <div className="space-y-5">

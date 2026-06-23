@@ -48,8 +48,18 @@ export default async function handler(
     return res.status(401).json({ message: 'Authentication required' });
   }
 
+  const { from, to } = req.query;
+  const dateFilter: { gte?: Date; lte?: Date } = {};
+  if (typeof from === 'string') dateFilter.gte = new Date(from);
+  if (typeof to === 'string') dateFilter.lte = new Date(to);
+
   const rows = await prisma.transaction.findMany({
-    where: { userId: auth.userId, isDuplicate: false, linkedToId: null },
+    where: {
+      userId: auth.userId,
+      isDuplicate: false,
+      linkedToId: null,
+      ...(Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {}),
+    },
     orderBy: { date: 'asc' },
   });
 
