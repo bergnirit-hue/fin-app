@@ -15,18 +15,25 @@ interface DashboardMetrics {
   byCategory: { [key: string]: number };
 }
 
-type PeriodKey = '1m' | '3m' | '6m' | '1y' | 'all';
+type PeriodKey = '1m' | '3m' | '6m' | '1y' | 'all' | 'custom';
 
-function periodRange(key: PeriodKey): { from?: string; to?: string } {
-  if (key === 'all') return {};
+function periodDates(key: Exclude<PeriodKey, 'custom'>): { from: string; to: string } {
   const now = new Date();
-  const to = now.toISOString();
+  const to = now.toISOString().slice(0, 10);
+  if (key === 'all') return { from: '', to: '' };
   const from = new Date(now);
   if (key === '1m') from.setMonth(from.getMonth() - 1);
   else if (key === '3m') from.setMonth(from.getMonth() - 3);
   else if (key === '6m') from.setMonth(from.getMonth() - 6);
   else if (key === '1y') from.setFullYear(from.getFullYear() - 1);
-  return { from: from.toISOString(), to };
+  return { from: from.toISOString().slice(0, 10), to };
+}
+
+function dateRangeToQuery(from: string, to: string): string {
+  const params = new URLSearchParams();
+  if (from) params.set('from', new Date(from).toISOString());
+  if (to) params.set('to', new Date(to + 'T23:59:59').toISOString());
+  return params.toString();
 }
 
 // Color system from Figma design
@@ -44,6 +51,7 @@ const PERIOD_I18N: Record<PeriodKey, string> = {
   '6m': 'dashboard.periodLast6',
   '1y': 'dashboard.periodLastYear',
   all: 'dashboard.periodAll',
+  custom: 'dashboard.periodCustom',
 };
 
 export default function Dashboard() {
@@ -52,6 +60,24 @@ export default function Dashboard() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodKey>('1m');
+  const initialDates = periodDates('1m');
+  const [fromDate, setFromDate] = useState(initialDates.from);
+  const [toDate, setToDate] = useState(initialDates.to);
+
+  function handlePeriodChange(key: PeriodKey) {
+    setPeriod(key);
+    if (key !== 'custom') {
+      const d = periodDates(key);
+      setFromDate(d.from);
+      setToDate(d.to);
+    }
+  }
+
+  function handleDateChange(which: 'from' | 'to', value: string) {
+    if (which === 'from') setFromDate(value);
+    else setToDate(value);
+    setPeriod('custom');
+  }
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -63,11 +89,7 @@ export default function Dashboard() {
     setLoading(true);
     (async () => {
       try {
-        const range = periodRange(period);
-        const params = new URLSearchParams();
-        if (range.from) params.set('from', range.from);
-        if (range.to) params.set('to', range.to);
-        const qs = params.toString();
+        const qs = dateRangeToQuery(fromDate, toDate);
 
         const res = await fetch(`/api/dashboard${qs ? `?${qs}` : ''}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -102,7 +124,7 @@ export default function Dashboard() {
         setLoading(false);
       }
     })();
-  }, [router, period]);
+  }, [router, fromDate, toDate]);
 
   if (loading) {
     return (
@@ -153,26 +175,36 @@ export default function Dashboard() {
             </h1>
             <p className="text-slate-400 text-lg">{t('dashboard.subtitle')}</p>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            {([
-              ['1m', t('dashboard.periodLastMonth')],
-              ['3m', t('dashboard.periodLast3')],
-              ['6m', t('dashboard.periodLast6')],
-              ['1y', t('dashboard.periodLastYear')],
-              ['all', t('dashboard.periodAll')],
-            ] as [PeriodKey, string][]).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setPeriod(key)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  period === key
-                    ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/50'
-                    : 'bg-slate-700/50 text-slate-400 border border-slate-600/50 hover:bg-slate-600/50 hover:text-slate-300'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            <select
+              value={period}
+              onChange={(e) => handlePeriodChange(e.target.value as PeriodKey)}
+              className="px-4 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-xl text-sm font-semibold text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 [color-scheme:dark] cursor-pointer"
+            >
+              <option value="1m">{t('dashboard.periodLastMonth')}</option>
+              <option value="3m">{t('dashboard.periodLast3')}</option>
+              <option value="6m">{t('dashboard.periodLast6')}</option>
+              <option value="1y">{t('dashboard.periodLastYear')}</option>
+              <option value="all">{t('dashboard.periodAll')}</option>
+              {period === 'custom' && (
+                <option value="custom">{t('dashboard.periodCustom')}</option>
+              )}
+            </select>
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white [color-scheme:dark]">
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => handleDateChange('from', e.target.value)}
+                className="bg-transparent text-sm text-white focus:outline-none"
+              />
+              <span className="text-slate-500">→</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => handleDateChange('to', e.target.value)}
+                className="bg-transparent text-sm text-white focus:outline-none"
+              />
+            </div>
           </div>
         </div>
 

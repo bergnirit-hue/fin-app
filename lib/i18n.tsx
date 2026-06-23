@@ -81,6 +81,7 @@ const en: Dict = {
     periodLast6: '6 months',
     periodLastYear: 'Year',
     periodAll: 'All time',
+    periodCustom: 'Custom',
   },
   upload: {
     title: 'Upload Transactions',
@@ -297,6 +298,7 @@ const he: Dict = {
     periodLast6: '6 חודשים',
     periodLastYear: 'שנה',
     periodAll: 'הכל',
+    periodCustom: 'מותאם',
   },
   upload: {
     title: 'העלאת עסקאות',
