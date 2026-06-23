@@ -1,10 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/utils/db';
 import { extractUserFromRequest } from '@/lib/utils/auth';
-import {
-  CalculationEngine,
-  TransactionWithCategory,
-} from '@/lib/core/calculations';
 import { ClassificationType } from '@/lib/core/classification';
 
 export interface DashboardResponse {
@@ -67,56 +63,32 @@ export default async function handler(
     return res.status(200).json(EMPTY);
   }
 
-  const transactions: TransactionWithCategory[] = rows.map((r) => ({
-    date: r.date,
-    amount: r.amount,
-    merchant: r.merchant,
-    description: r.description ?? undefined,
-    sourceType: r.sourceType,
-    category: r.category ?? 'Other',
-    classification: (r.classification as ClassificationType) ?? 'variable',
-  }));
-
-  // Reuse CalculationEngine over every year present in the data for the
-  // headline income / expense / savings / classification figures.
-  const years = Array.from(
-    new Set(transactions.map((t) => t.date.getFullYear()))
-  );
-
   let totalIncome = 0;
   let totalExpenses = 0;
   let fixed = 0;
   let variable = 0;
   let savingsDebt = 0;
   let incomeClassification = 0;
+  const byCategory: { [category: string]: number } = {};
 
-  for (const year of years) {
-    const yearly = CalculationEngine.calculateYearly(transactions, year);
-    totalIncome += yearly.totalIncome;
-    totalExpenses += yearly.totalExpenses;
-    for (const month of yearly.months) {
-      fixed += month.byClassification.fixed;
-      variable += month.byClassification.variable;
-      savingsDebt += month.byClassification.savings_debt;
-      incomeClassification += month.byClassification.income;
+  for (const r of rows) {
+    const cls = (r.classification as ClassificationType) ?? 'variable';
+    if (r.amount >= 0) {
+      totalIncome += r.amount;
+    } else {
+      totalExpenses += Math.abs(r.amount);
+      byCategory[r.category ?? 'Other'] =
+        (byCategory[r.category ?? 'Other'] ?? 0) + Math.abs(r.amount);
     }
+    if (cls === 'fixed') fixed += Math.abs(r.amount);
+    else if (cls === 'variable') variable += Math.abs(r.amount);
+    else if (cls === 'savings_debt') savingsDebt += Math.abs(r.amount);
+    else if (cls === 'income') incomeClassification += r.amount;
   }
 
   const savings = totalIncome - totalExpenses;
   const savingsPercentage =
     totalIncome > 0 ? (savings / totalIncome) * 100 : 0;
-
-  // Expense-only category breakdown. The engine's byCategory also folds in
-  // income (it sums abs amounts for every transaction), which would make
-  // income categories like "Salary" appear as top spending — so build this
-  // directly from the outgoing transactions instead.
-  const byCategory: { [category: string]: number } = {};
-  for (const tx of transactions) {
-    if (tx.amount < 0) {
-      byCategory[tx.category] =
-        (byCategory[tx.category] ?? 0) + Math.abs(tx.amount);
-    }
-  }
 
   return res.status(200).json({
     hasData: true,
@@ -129,6 +101,6 @@ export default async function handler(
     savingsDebt,
     incomeClassification,
     byCategory,
-    transactionCount: transactions.length,
+    transactionCount: rows.length,
   });
 }
