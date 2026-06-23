@@ -118,12 +118,8 @@ export class TransactionParser {
       header: 1, // raw column-index arrays
     });
 
-    const amountRe = /₪\s*([\d,]+(?:\.\d+)?)/;
-    // Last 4 digits of the card number — appears after a dash at the end
-    // of the card name cell, e.g. "גולד - מסטרקארד - 5560".
-    // The dash prefix prevents matching years like "2026" from title rows.
-    const last4Re = /[-–]\s*(\d{4})\s*$/;
-    // Cardholder line: "על שם NAME" (possibly followed by other info).
+    const amountRe = /₪\s*([\d,]+(?:\.\d+)?)|([\d,]+(?:\.\d+)?)\s*₪/;
+    const last4Re = /[-–]\s*(\d{4})\s*$|המסתיים\s+ב[-–]?\s*(\d{4})/;
     const holderRe = /על\s+שם\s+(.+)/;
 
     let billingTotal: number | null = null;
@@ -141,7 +137,7 @@ export class TransactionParser {
         if (!billingTotal) {
           const am = str.match(amountRe);
           if (am) {
-            const total = parseFloat(am[1].replace(/,/g, ''));
+            const total = parseFloat((am[1] || am[2]).replace(/,/g, ''));
             if (!isNaN(total) && total > 0) billingTotal = total;
           }
         }
@@ -150,7 +146,7 @@ export class TransactionParser {
         // same row that has the billing total or the row before it).
         if (!last4) {
           const dm = str.match(last4Re);
-          if (dm) last4 = dm[1];
+          if (dm) last4 = dm[1] || dm[2];
         }
 
         // Cardholder name ("על שם …")

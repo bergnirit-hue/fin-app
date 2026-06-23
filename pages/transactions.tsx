@@ -437,7 +437,9 @@ export default function Transactions() {
                             <span dir="ltr">{tx.amount >= 0 ? '+' : '−'}{formatMoney(Math.abs(tx.amount))}</span>
                           </td>
                           <td className="px-6 py-4">
-                            {editingId === tx.id ? (
+                            {expandable ? (
+                              <span className="text-slate-500 text-xs">&mdash;</span>
+                            ) : editingId === tx.id ? (
                               <select
                                 autoFocus
                                 value={tx.category}
@@ -467,7 +469,11 @@ export default function Transactions() {
                             )}
                           </td>
                           <td className="px-6 py-4">
-                            <ClassificationBadge classification={tx.classification} t={t} />
+                            {expandable ? (
+                              <span className="text-slate-500 text-xs">&mdash;</span>
+                            ) : (
+                              <ClassificationBadge classification={tx.classification} t={t} />
+                            )}
                           </td>
                           <td className="px-6 py-4 text-slate-400 text-sm font-medium">
                             {tx.sourceType === 'bit' ? `${sourceLabel('bit')} (יתרה)` : sourceLabel(tx.sourceType)}
