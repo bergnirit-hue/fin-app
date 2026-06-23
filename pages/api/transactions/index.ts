@@ -38,9 +38,8 @@ export default async function handler(
 
   const where: Prisma.TransactionWhereInput = {
     userId: auth.userId,
-    // Exclude linked (child) transactions — they appear nested under
-    // their parent bank entry instead.
     linkedToId: null,
+    isDuplicate: false,
   };
 
   if (typeof category === 'string' && category && category !== 'all') {

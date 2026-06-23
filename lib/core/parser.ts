@@ -22,6 +22,7 @@ export interface ParsedTransaction {
   merchant: string;
   description?: string;
   sourceType: string;
+  paymentMethod?: string;
 }
 
 export interface ParseResult {
@@ -117,12 +118,8 @@ export class TransactionParser {
       header: 1, // raw column-index arrays
     });
 
-    const amountRe = /₪\s*([\d,]+(?:\.\d+)?)/;
-    // Last 4 digits of the card number — appears after a dash at the end
-    // of the card name cell, e.g. "גולד - מסטרקארד - 5560".
-    // The dash prefix prevents matching years like "2026" from title rows.
-    const last4Re = /[-–]\s*(\d{4})\s*$/;
-    // Cardholder line: "על שם NAME" (possibly followed by other info).
+    const amountRe = /₪\s*([\d,]+(?:\.\d+)?)|([\d,]+(?:\.\d+)?)\s*₪/;
+    const last4Re = /[-–]\s*(\d{4})\s*$|המסתיים\s+ב[-–]?\s*(\d{4})/;
     const holderRe = /על\s+שם\s+(.+)/;
 
     let billingTotal: number | null = null;
@@ -140,7 +137,7 @@ export class TransactionParser {
         if (!billingTotal) {
           const am = str.match(amountRe);
           if (am) {
-            const total = parseFloat(am[1].replace(/,/g, ''));
+            const total = parseFloat((am[1] || am[2]).replace(/,/g, ''));
             if (!isNaN(total) && total > 0) billingTotal = total;
           }
         }
@@ -149,7 +146,7 @@ export class TransactionParser {
         // same row that has the billing total or the row before it).
         if (!last4) {
           const dm = str.match(last4Re);
-          if (dm) last4 = dm[1];
+          if (dm) last4 = dm[1] || dm[2];
         }
 
         // Cardholder name ("על שם …")
@@ -336,6 +333,72 @@ export class TransactionParser {
     return (credit ?? 0) - (debit ?? 0);
   }
 
+  /**
+   * Detect Bit export format by checking for Bit-specific headers.
+   * Returns a dedicated mapping if found, null otherwise.
+   */
+  static detectBitFormat(headers: string[]): ColumnMapping | null {
+    const joined = headers.join(' ');
+    const hasBitHeaders =
+      /סטטוס/i.test(joined) &&
+      /מאת\/ל/i.test(joined) &&
+      /זיכוי\/חיוב/i.test(joined);
+
+    if (!hasBitHeaders) return null;
+
+    const find = (re: RegExp) => headers.find((h) => re.test(h));
+
+    const dateColumn = find(/תאריך/i);
+    const merchantColumn = find(/מאת\/ל/i);
+    const amountColumn = find(/^\s*סכום\s*$/i) || find(/סכום(?!.*עמלה)/i);
+    const descriptionColumn = find(/תיאור/i);
+
+    if (!dateColumn || !merchantColumn || !amountColumn) return null;
+
+    return {
+      dateColumn,
+      merchantColumn,
+      amountColumn,
+      ...(descriptionColumn ? { descriptionColumn } : {}),
+    };
+  }
+
+  /**
+   * Filter and transform Bit export rows:
+   * - Skip non-completed rows (סורב, עבר התוקף)
+   * - Apply sign from זיכוי/חיוב column (חיוב = negative, זיכוי = positive)
+   * - Skip footer/disclaimer rows
+   */
+  static filterBitRows(data: any[]): any[] {
+    const statusCol = Object.keys(data[0] || {}).find((h) => /סטטוס/i.test(h));
+    const signCol = Object.keys(data[0] || {}).find((h) => /זיכוי\/חיוב/i.test(h));
+    const amountCol = Object.keys(data[0] || {}).find(
+      (h) => /^\s*סכום\s*$/i.test(h) || (/סכום/i.test(h) && !/עמלה/i.test(h))
+    );
+    const payMethodCol = Object.keys(data[0] || {}).find((h) => /אמצעי\s*תשלום/i.test(h));
+
+    return data.filter((row) => {
+      if (!statusCol) return true;
+      const status = String(row[statusCol] ?? '').trim();
+      return status === 'בוצע';
+    }).map((row) => {
+      const patched = { ...row };
+      if (signCol && amountCol) {
+        const sign = String(row[signCol] ?? '').trim();
+        const amount = parseFloat(String(row[amountCol] ?? '0').replace(/[^0-9.\-]/g, ''));
+        if (!isNaN(amount)) {
+          patched[amountCol] = sign === 'זיכוי' ? amount : -amount;
+        }
+      }
+      // Normalise the payment method into a dedicated key so callers
+      // don't need to locate the Hebrew column themselves.
+      if (payMethodCol) {
+        patched.__paymentMethod = String(row[payMethodCol] ?? '').trim();
+      }
+      return patched;
+    });
+  }
+
   static detectColumns(data: any[]): ColumnMapping | null {
     if (!data || data.length === 0) return null;
 
@@ -357,8 +420,9 @@ export class TransactionParser {
     // "סכום עסקה" (transaction amount — the full purchase price, which can
     // differ for installment payments or discounted fees).  Fall back to the
     // generic "סכום" / "amount" pattern for bank statements and other files.
+    // Use negative lookahead to skip "סכום עמלה" (fee column in Bit exports).
     const amountColumn =
-      find(/סכום.?חיוב/i) || find(/amount|סכום|transaction amount/i);
+      find(/סכום.?חיוב/i) || find(/סכום(?!.*עמלה)/i) || find(/amount|transaction amount/i);
 
     // When "סכום חיוב" is selected, it's always positive — even for
     // refunds.  "סכום עסקה" carries the correct sign (negative = credit),
