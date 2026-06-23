@@ -470,7 +470,7 @@ export default function Transactions() {
                             <ClassificationBadge classification={tx.classification} t={t} />
                           </td>
                           <td className="px-6 py-4 text-slate-400 text-sm font-medium">
-                            {sourceLabel(tx.sourceType)}
+                            {tx.sourceType === 'bit' ? `${sourceLabel('bit')} (יתרה)` : sourceLabel(tx.sourceType)}
                           </td>
                         </tr>
 

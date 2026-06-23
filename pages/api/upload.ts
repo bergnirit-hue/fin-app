@@ -11,6 +11,17 @@ import { ClassificationEngine, ClassificationType } from '@/lib/core/classificat
 import { findMatchingBankEntry, looksLikeCreditCardFile } from '@/lib/core/reconciliation';
 import { crossReference, detectPaymentService } from '@/lib/core/cross-reference';
 
+const CC_FILENAME_PATTERNS = [
+  /פירוט.*חיוב/i,       // "פירוט חיובים..." — charge detail
+  /חיוב.*כרטיס/i,       // "חיובים לכרטיס..." — charges for card
+  /כרטיס.*מאסטרקארד/i,  // "כרטיס מאסטרקארד" — Mastercard card
+  /כרטיס.*ויזה/i,       // "כרטיס ויזה" — Visa card
+  /כרטיס.*אמריקן/i,     // "כרטיס אמריקן" — Amex card
+  /\bcal\b/i,            // Cal (כאל)
+  /isracard/i,           // Isracard
+  /leumi.?card/i,        // Leumi Card
+];
+
 interface UploadResponse {
   success: boolean;
   message: string;
@@ -105,11 +116,15 @@ export default async function handler(
         }
       }
 
-      // Auto-detect credit-card files based on column headers, even if the
-      // user selected "bank" as the source type.
-      if (sourceType !== 'credit_card' && looksLikeCreditCardFile(fileHeaders)) {
-        sourceType = 'credit_card';
-        console.log('Upload: auto-detected credit-card file from headers');
+      // Auto-detect credit-card files from headers or filename.
+      if (sourceType !== 'credit_card') {
+        if (looksLikeCreditCardFile(fileHeaders)) {
+          sourceType = 'credit_card';
+          console.log('Upload: auto-detected credit-card file from headers');
+        } else if (CC_FILENAME_PATTERNS.some((re) => re.test(filename))) {
+          sourceType = 'credit_card';
+          console.log('Upload: auto-detected credit-card file from filename');
+        }
       }
 
       // For Bit files we already have filtered rows; parse them directly.
@@ -158,10 +173,18 @@ export default async function handler(
         }
       }
 
-      // Auto-detect credit-card files based on column headers.
-      if (sourceType !== 'credit_card' && looksLikeCreditCardFile(fileHeaders)) {
-        sourceType = 'credit_card';
-        console.log('Upload: auto-detected credit-card file from headers');
+      // Auto-detect credit-card files from headers, filename, or metadata.
+      if (sourceType !== 'credit_card') {
+        if (looksLikeCreditCardFile(fileHeaders)) {
+          sourceType = 'credit_card';
+          console.log('Upload: auto-detected credit-card file from headers');
+        } else if (CC_FILENAME_PATTERNS.some((re) => re.test(filename))) {
+          sourceType = 'credit_card';
+          console.log('Upload: auto-detected credit-card file from filename');
+        } else if (billingTotal != null || cardLabel != null) {
+          sourceType = 'credit_card';
+          console.log('Upload: auto-detected credit-card file from metadata (billingTotal/cardLabel)');
+        }
       }
 
       parseResult = await TransactionParser.parseExcel(
@@ -312,10 +335,12 @@ export default async function handler(
     // Record the upload, then persist standalone transactions.
     const upload = await prisma.upload.create({
       data: {
-        userId: auth.userId,
+        user: { connect: { id: auth.userId } },
         fileName: filename,
         sourceType,
         transactionCount: standaloneTx.length + ccPaidRows.length,
+        ...(billingTotal != null ? { billingTotal } : {}),
+        ...(cardLabel != null ? { cardLabel } : {}),
       },
     });
 
@@ -333,6 +358,75 @@ export default async function handler(
           sourceType: tx.sourceType,
         })),
       });
+    }
+
+    // ── Forward reconciliation: bank upload → unlinked CC groups ────
+    // When a bank file is uploaded, try to link existing CC uploads that
+    // couldn't find a bank parent at their upload time.
+    let forwardReconcileCount = 0;
+    if (sourceType === 'bank' && standaloneTx.length > 0) {
+      const newBankRows = await prisma.transaction.findMany({
+        where: {
+          uploadId: upload.id,
+          amount: { lt: 0 },
+        },
+      });
+
+      // Find CC uploads that have unlinked rows (no linkedToId set).
+      const unlnkCcRows = await prisma.transaction.findMany({
+        where: {
+          userId: auth.userId,
+          linkedToId: null,
+          uploadId: { not: upload.id },
+        },
+        select: { id: true, date: true, amount: true, uploadId: true },
+      });
+
+      // Only consider uploads whose sourceType is credit_card.
+      const ccUploads = await prisma.upload.findMany({
+        where: { userId: auth.userId, sourceType: 'credit_card' },
+        select: { id: true, billingTotal: true, cardLabel: true },
+      });
+      const ccUploadMap = new Map(ccUploads.map((u) => [u.id, u]));
+
+      // Group by uploadId — each CC upload is one billing cycle.
+      const byUpload = new Map<string, typeof unlnkCcRows>();
+      for (const row of unlnkCcRows) {
+        if (!row.uploadId || !ccUploadMap.has(row.uploadId)) continue;
+        if (!byUpload.has(row.uploadId)) byUpload.set(row.uploadId, []);
+        byUpload.get(row.uploadId)!.push(row);
+      }
+
+      for (const [ccUploadId, ccRows] of byUpload) {
+        const storedBilling = ccUploadMap.get(ccUploadId)?.billingTotal;
+        const ccTotal = storedBilling ?? Math.abs(ccRows.reduce((s, r) => s + r.amount, 0));
+        const storedCardLabel = ccUploadMap.get(ccUploadId)?.cardLabel;
+        const ccLatestDate = ccRows.reduce(
+          (latest, r) => (r.date > latest ? r.date : latest),
+          ccRows[0].date
+        );
+
+        const match = findMatchingBankEntry(newBankRows, ccTotal, ccLatestDate);
+        if (match) {
+          await prisma.transaction.updateMany({
+            where: { uploadId: ccUploadId, linkedToId: null },
+            data: { linkedToId: match.id },
+          });
+          if (storedCardLabel) {
+            await prisma.transaction.update({
+              where: { id: match.id },
+              data: { description: storedCardLabel },
+            });
+          }
+          // Remove matched bank row from candidates so it's not reused.
+          const idx = newBankRows.findIndex((r) => r.id === match.id);
+          if (idx !== -1) newBankRows.splice(idx, 1);
+          forwardReconcileCount += ccRows.length;
+          console.log(
+            `Upload: forward-reconciled ${ccRows.length} CC details (upload ${ccUploadId}) → bank "${match.merchant}" (${match.id})`
+          );
+        }
+      }
     }
 
     // ── Credit-card ↔ bank reconciliation ──────────────────────────
@@ -546,7 +640,9 @@ export default async function handler(
       ? ` (${crossRefCount} entries enriched via ${paymentService})`
       : reverseCrossRefCount > 0
         ? ` (${reverseCrossRefCount} entries enriched via pending cross-ref)`
-        : '';
+        : forwardReconcileCount > 0
+          ? ` (${forwardReconcileCount} CC details linked to new bank entries)`
+          : '';
 
     const savedCount = standaloneTx.length;
     return res.status(200).json({
