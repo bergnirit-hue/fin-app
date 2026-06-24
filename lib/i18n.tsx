@@ -145,6 +145,9 @@ const en: Dict = {
     cancel: 'Cancel',
     detailMissing: 'Detail missing',
     charges: 'charges',
+    thNotes: 'Notes',
+    addNote: 'Add note...',
+    noteSaved: 'Note saved',
   },
   settings: {
     title: 'Settings',
@@ -355,6 +358,9 @@ const he: Dict = {
     cancel: 'ביטול',
     detailMissing: 'פירוט חסר',
     charges: 'חיובים',
+    thNotes: 'הערות',
+    addNote: 'הוסף הערה...',
+    noteSaved: 'ההערה נשמרה',
   },
   settings: {
     title: 'הגדרות',
