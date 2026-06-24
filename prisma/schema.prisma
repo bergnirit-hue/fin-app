@@ -98,6 +98,8 @@ model Upload {
   sourceType    String   // "bank", "bit", "paypal", etc.
   billingTotal  Float?   // CC file metadata: actual bank billing amount
   cardLabel     String?  // CC file metadata: e.g. "כרטיס 5560 ע״ש נירית ברג"
+  fileData      Bytes?   // Original file content for permanent archive
+  fileSize      Int?     // File size in bytes
 
   user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   household    Household?     @relation(fields: [householdId], references: [id], onDelete: Cascade)
