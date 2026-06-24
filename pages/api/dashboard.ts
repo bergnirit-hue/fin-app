@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/utils/db';
 import { extractUserFromRequest } from '@/lib/utils/auth';
 import { ClassificationType } from '@/lib/core/classification';
+import { isCreditCardMerchant } from '@/lib/core/reconciliation';
 
 export interface MonthlyTrendItem {
   month: string; // "2025-01"
@@ -20,6 +21,12 @@ export interface CategoryTrendItem {
   [category: string]: string | number; // month is string, rest are numbers
 }
 
+export interface MerchantBreakdownItem {
+  merchant: string;
+  amount: number;
+  count: number;
+}
+
 export interface DashboardResponse {
   hasData: boolean;
   totalIncome: number;
@@ -34,6 +41,7 @@ export interface DashboardResponse {
   transactionCount: number;
   monthlyTrend: MonthlyTrendItem[];
   topMerchants: TopMerchantItem[];
+  merchantBreakdown: MerchantBreakdownItem[];
   categoryTrend: CategoryTrendItem[];
 }
 
@@ -51,6 +59,7 @@ const EMPTY: DashboardResponse = {
   transactionCount: 0,
   monthlyTrend: [],
   topMerchants: [],
+  merchantBreakdown: [],
   categoryTrend: [],
 };
 
@@ -72,6 +81,7 @@ export default async function handler(
   if (typeof from === 'string') dateFilter.gte = new Date(from);
   if (typeof to === 'string') dateFilter.lte = new Date(to);
 
+  // Fetch top-level rows (no parent) for totals, trend, merchants
   const rows = await prisma.transaction.findMany({
     where: {
       userId: auth.userId,
@@ -85,6 +95,19 @@ export default async function handler(
   if (rows.length === 0) {
     return res.status(200).json(EMPTY);
   }
+
+  // Fetch CC detail rows (linked) — these have enriched categories
+  const linkedRows = await prisma.transaction.findMany({
+    where: {
+      userId: auth.userId,
+      isDuplicate: false,
+      linkedToId: { not: null },
+      ...(Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {}),
+    },
+  });
+
+  // Build a set of parent IDs that have CC details
+  const parentsWithDetails = new Set(linkedRows.map((r) => r.linkedToId!));
 
   let totalIncome = 0;
   let totalExpenses = 0;
@@ -100,13 +123,25 @@ export default async function handler(
       totalIncome += r.amount;
     } else {
       totalExpenses += Math.abs(r.amount);
-      byCategory[r.category ?? 'Other'] =
-        (byCategory[r.category ?? 'Other'] ?? 0) + Math.abs(r.amount);
+      // For category breakdown: if this parent has CC details, skip it —
+      // we'll use the enriched detail categories instead.
+      if (!parentsWithDetails.has(r.id)) {
+        byCategory[r.category ?? 'Other'] =
+          (byCategory[r.category ?? 'Other'] ?? 0) + Math.abs(r.amount);
+      }
     }
     if (cls === 'fixed') fixed += Math.abs(r.amount);
     else if (cls === 'variable') variable += Math.abs(r.amount);
     else if (cls === 'savings_debt') savingsDebt += Math.abs(r.amount);
     else if (cls === 'income') incomeClassification += r.amount;
+  }
+
+  // Add CC detail categories to the breakdown
+  for (const r of linkedRows) {
+    if (r.amount < 0) {
+      byCategory[r.category ?? 'Other'] =
+        (byCategory[r.category ?? 'Other'] ?? 0) + Math.abs(r.amount);
+    }
   }
 
   const savings = totalIncome - totalExpenses;
@@ -125,11 +160,12 @@ export default async function handler(
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, v]) => ({ month, income: v.income, expenses: v.expenses }));
 
-  // ── Top merchants by spend ──
+  // ── Top merchants by spend (CC companies grouped) ──
+  const CC_GROUP_KEY = '__credit_cards__';
   const merchantMap: Record<string, { amount: number; count: number }> = {};
   for (const r of rows) {
     if (r.amount < 0) {
-      const key = r.merchant;
+      const key = isCreditCardMerchant(r.merchant) ? CC_GROUP_KEY : r.merchant;
       if (!merchantMap[key]) merchantMap[key] = { amount: 0, count: 0 };
       merchantMap[key].amount += Math.abs(r.amount);
       merchantMap[key].count += 1;
@@ -140,6 +176,8 @@ export default async function handler(
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 10);
 
+  const merchantBreakdown = topMerchants;
+
   // ── Category trend (top 5 categories per month) ──
   const topCats = Object.entries(byCategory)
     .sort(([, a], [, b]) => b - a)
@@ -147,13 +185,19 @@ export default async function handler(
     .map(([c]) => c);
 
   const catTrendMap: Record<string, Record<string, number>> = {};
-  for (const r of rows) {
+  const addToCatTrend = (r: { date: Date; category: string | null; amount: number }) => {
     const cat = r.category ?? 'Other';
     if (r.amount < 0 && topCats.includes(cat)) {
       const m = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, '0')}`;
       if (!catTrendMap[m]) catTrendMap[m] = {};
       catTrendMap[m][cat] = (catTrendMap[m][cat] ?? 0) + Math.abs(r.amount);
     }
+  };
+  for (const r of rows) {
+    if (!parentsWithDetails.has(r.id)) addToCatTrend(r);
+  }
+  for (const r of linkedRows) {
+    addToCatTrend(r);
   }
   const categoryTrend = Object.entries(catTrendMap)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -173,6 +217,7 @@ export default async function handler(
     transactionCount: rows.length,
     monthlyTrend,
     topMerchants,
+    merchantBreakdown,
     categoryTrend,
   });
 }

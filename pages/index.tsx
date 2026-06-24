@@ -29,6 +29,12 @@ interface TopMerchantItem {
   count: number;
 }
 
+interface MerchantBreakdownItem {
+  merchant: string;
+  amount: number;
+  count: number;
+}
+
 interface DashboardMetrics {
   totalIncome: number;
   totalExpenses: number;
@@ -41,6 +47,7 @@ interface DashboardMetrics {
   byCategory: { [key: string]: number };
   monthlyTrend: MonthlyTrendItem[];
   topMerchants: TopMerchantItem[];
+  merchantBreakdown: MerchantBreakdownItem[];
   categoryTrend: Record<string, string | number>[];
 }
 
@@ -160,6 +167,7 @@ export default function Dashboard() {
             byCategory: data.byCategory,
             monthlyTrend: data.monthlyTrend ?? [],
             topMerchants: data.topMerchants ?? [],
+            merchantBreakdown: data.merchantBreakdown ?? [],
             categoryTrend: data.categoryTrend ?? [],
           });
         }
@@ -196,14 +204,27 @@ export default function Dashboard() {
     );
   }
 
-  const topCategories = Object.entries(metrics.byCategory)
+  const allCategories = Object.entries(metrics.byCategory)
     .map(([category, amount]) => ({
       category,
       amount,
       percentage: (amount / metrics.totalExpenses) * 100,
     }))
-    .sort((a, b) => b.amount - a.amount)
-    .slice(0, 5);
+    .sort((a, b) => b.amount - a.amount);
+
+  const topCategories = allCategories.slice(0, 5);
+
+  const CC_GROUP_KEY = '__credit_cards__';
+
+  const catLabel = (cat: string) => {
+    const translated = t(`categories.${cat}`);
+    return translated === `categories.${cat}` ? cat : translated;
+  };
+  const merchantPieData = metrics.merchantBreakdown.slice(0, 8).map((m) => ({
+    name: m.merchant === CC_GROUP_KEY ? t('dashboard.creditCards') : m.merchant,
+    value: m.amount,
+  }));
+  const merchantTotal = merchantPieData.reduce((s, m) => s + m.value, 0);
 
   return (
     <>
@@ -305,7 +326,7 @@ export default function Dashboard() {
             </div>
 
             <div className="space-y-5">
-              {topCategories.map((cat, idx) => {
+              {allCategories.map((cat, idx) => {
                 const categoryColors = [
                   { bar: 'from-emerald-500 to-emerald-400', accent: 'emerald' },
                   { bar: 'from-cyan-500 to-cyan-400', accent: 'cyan' },
@@ -319,7 +340,7 @@ export default function Dashboard() {
                   <div key={cat.category} className="group">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-slate-200 font-semibold text-sm">
-                        {t(`categories.${cat.category}`)}
+                        {catLabel(cat.category)}
                       </span>
                       <span className="text-slate-100 font-bold text-lg">
                         {formatMoney(cat.amount)}
@@ -438,8 +459,8 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
                 <Pie
-                  data={topCategories.map((c) => ({
-                    name: t(`categories.${c.category}`),
+                  data={allCategories.map((c) => ({
+                    name: catLabel(c.category),
                     value: c.amount,
                   }))}
                   cx="50%"
@@ -449,8 +470,22 @@ export default function Dashboard() {
                   paddingAngle={3}
                   dataKey="value"
                   stroke="none"
+                  label={(props: any) => {
+                    const { cx, cy, midAngle, innerRadius: ir, outerRadius: or, percent } = props;
+                    if (!percent || percent < 0.03) return null;
+                    const RADIAN = Math.PI / 180;
+                    const radius = ir + (or - ir) * 0.5;
+                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                    return (
+                      <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="bold">
+                        {`${(percent * 100).toFixed(0)}%`}
+                      </text>
+                    );
+                  }}
+                  labelLine={false}
                 >
-                  {topCategories.map((_, i) => (
+                  {allCategories.map((_, i) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
@@ -470,55 +505,56 @@ export default function Dashboard() {
         </div>
         )}
 
-        {/* Category Trend + Top Merchants */}
+        {/* Merchant Breakdown Pie + Top Merchants Bar */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Category Trend Lines */}
-          {metrics.categoryTrend.length > 1 && (
+          {/* Merchant Breakdown Pie Chart */}
+          {merchantPieData.length > 0 && (
           <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur-lg border border-slate-600/50 rounded-2xl p-8 shadow-2xl">
             <h2 className="text-xl font-bold text-white mb-1">
-              📊 {t('dashboard.categoryTrend')}
+              🏪 {t('dashboard.merchantBreakdown')}
             </h2>
-            <p className="text-sm text-slate-400 mb-6">{t('dashboard.categoryTrendSub')}</p>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={metrics.categoryTrend} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                <XAxis
-                  dataKey="month"
-                  tick={{ fill: '#94a3b8', fontSize: 12 }}
-                  tickFormatter={(v: string) => {
-                    const [y, m] = v.split('-');
-                    return `${m}/${y.slice(2)}`;
+            <p className="text-sm text-slate-400 mb-6">{t('dashboard.merchantBreakdownSub')}</p>
+            <ResponsiveContainer width="100%" height={320}>
+              <PieChart>
+                <Pie
+                  data={merchantPieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={120}
+                  paddingAngle={3}
+                  dataKey="value"
+                  stroke="none"
+                  label={(props: any) => {
+                    const { cx, cy, midAngle, innerRadius: ir, outerRadius: or, percent } = props;
+                    if (!percent || percent < 0.03) return null;
+                    const RADIAN = Math.PI / 180;
+                    const radius = ir + (or - ir) * 0.5;
+                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                    return (
+                      <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="bold">
+                        {`${(percent * 100).toFixed(0)}%`}
+                      </text>
+                    );
                   }}
-                  axisLine={{ stroke: '#475569' }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: '#94a3b8', fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)}
-                />
+                  labelLine={false}
+                >
+                  {merchantPieData.map((_, i) => (
+                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
                 <Tooltip
                   contentStyle={{ background: '#1e293b', border: '1px solid #475569', borderRadius: 12, color: '#e2e8f0' }}
                   formatter={(value: number) => formatMoney(value)}
-                  labelFormatter={(label: string) => {
-                    const [y, m] = label.split('-');
-                    return `${m}/${y}`;
-                  }}
                 />
-                <Legend wrapperStyle={{ color: '#94a3b8', fontSize: 12 }} />
-                {topCategories.slice(0, 5).map((cat, i) => (
-                  <Line
-                    key={cat.category}
-                    type="monotone"
-                    dataKey={cat.category}
-                    name={t(`categories.${cat.category}`)}
-                    stroke={CHART_COLORS[i % CHART_COLORS.length]}
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                ))}
-              </LineChart>
+                <Legend
+                  wrapperStyle={{ color: '#94a3b8', fontSize: 12 }}
+                  layout="vertical"
+                  align="right"
+                  verticalAlign="middle"
+                />
+              </PieChart>
             </ResponsiveContainer>
           </div>
           )}
@@ -537,8 +573,8 @@ export default function Dashboard() {
                 return (
                   <div key={m.merchant} className="group">
                     <div className="flex justify-between items-center mb-1">
-                      <span className="text-slate-200 font-medium text-sm truncate max-w-[60%]" title={m.merchant}>
-                        {m.merchant}
+                      <span className="text-slate-200 font-medium text-sm truncate max-w-[60%]" title={m.merchant === CC_GROUP_KEY ? t('dashboard.creditCards') : m.merchant}>
+                        {m.merchant === CC_GROUP_KEY ? t('dashboard.creditCards') : m.merchant}
                       </span>
                       <div className="flex items-center gap-3">
                         <span className="text-slate-500 text-xs">
@@ -565,6 +601,57 @@ export default function Dashboard() {
           </div>
           )}
         </div>
+
+        {/* Category Trend — full width */}
+        {metrics.categoryTrend.length > 1 && (
+        <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur-lg border border-slate-600/50 rounded-2xl p-8 shadow-2xl">
+          <h2 className="text-xl font-bold text-white mb-1">
+            📊 {t('dashboard.categoryTrend')}
+          </h2>
+          <p className="text-sm text-slate-400 mb-6">{t('dashboard.categoryTrendSub')}</p>
+          <ResponsiveContainer width="100%" height={360}>
+            <LineChart data={metrics.categoryTrend} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+              <XAxis
+                dataKey="month"
+                tick={{ fill: '#94a3b8', fontSize: 12 }}
+                tickFormatter={(v: string) => {
+                  const [y, m] = v.split('-');
+                  return `${m}/${y.slice(2)}`;
+                }}
+                axisLine={{ stroke: '#475569' }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fill: '#94a3b8', fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)}
+              />
+              <Tooltip
+                contentStyle={{ background: '#1e293b', border: '1px solid #475569', borderRadius: 12, color: '#e2e8f0' }}
+                formatter={(value: number) => formatMoney(value)}
+                labelFormatter={(label: string) => {
+                  const [y, m] = label.split('-');
+                  return `${m}/${y}`;
+                }}
+              />
+              <Legend wrapperStyle={{ color: '#94a3b8', fontSize: 12 }} />
+              {topCategories.slice(0, 5).map((cat, i) => (
+                <Line
+                  key={cat.category}
+                  type="monotone"
+                  dataKey={cat.category}
+                  name={catLabel(cat.category)}
+                  stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        )}
 
         {/* Call-to-Action Section */}
         <div className="bg-gradient-to-r from-emerald-600/20 via-cyan-600/20 to-violet-600/20 backdrop-blur-lg border border-emerald-400/30 rounded-2xl p-8 text-center shadow-2xl">
