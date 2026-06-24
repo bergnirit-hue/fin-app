@@ -7,6 +7,23 @@ import {
 } from '@/lib/core/calculations';
 import { ClassificationType } from '@/lib/core/classification';
 
+export interface MonthlyTrendItem {
+  month: string; // "2025-01"
+  income: number;
+  expenses: number;
+}
+
+export interface TopMerchantItem {
+  merchant: string;
+  amount: number;
+  count: number;
+}
+
+export interface CategoryTrendItem {
+  month: string;
+  [category: string]: string | number; // month is string, rest are numbers
+}
+
 export interface DashboardResponse {
   hasData: boolean;
   totalIncome: number;
@@ -19,6 +36,9 @@ export interface DashboardResponse {
   incomeClassification: number;
   byCategory: { [category: string]: number };
   transactionCount: number;
+  monthlyTrend: MonthlyTrendItem[];
+  topMerchants: TopMerchantItem[];
+  categoryTrend: CategoryTrendItem[];
 }
 
 const EMPTY: DashboardResponse = {
@@ -33,6 +53,9 @@ const EMPTY: DashboardResponse = {
   incomeClassification: 0,
   byCategory: {},
   transactionCount: 0,
+  monthlyTrend: [],
+  topMerchants: [],
+  categoryTrend: [],
 };
 
 export default async function handler(
@@ -108,6 +131,51 @@ export default async function handler(
     }
   }
 
+  // ── Monthly trend (income vs expenses per month) ──
+  const monthlyMap: Record<string, { income: number; expenses: number }> = {};
+  for (const tx of transactions) {
+    const m = `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, '0')}`;
+    if (!monthlyMap[m]) monthlyMap[m] = { income: 0, expenses: 0 };
+    if (tx.amount >= 0) monthlyMap[m].income += tx.amount;
+    else monthlyMap[m].expenses += Math.abs(tx.amount);
+  }
+  const monthlyTrend: MonthlyTrendItem[] = Object.entries(monthlyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, v]) => ({ month, income: v.income, expenses: v.expenses }));
+
+  // ── Top merchants by spend ──
+  const merchantMap: Record<string, { amount: number; count: number }> = {};
+  for (const tx of transactions) {
+    if (tx.amount < 0) {
+      const key = tx.merchant;
+      if (!merchantMap[key]) merchantMap[key] = { amount: 0, count: 0 };
+      merchantMap[key].amount += Math.abs(tx.amount);
+      merchantMap[key].count += 1;
+    }
+  }
+  const topMerchants: TopMerchantItem[] = Object.entries(merchantMap)
+    .map(([merchant, v]) => ({ merchant, ...v }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 10);
+
+  // ── Category trend (top 5 categories per month) ──
+  const topCats = Object.entries(byCategory)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([c]) => c);
+
+  const catTrendMap: Record<string, Record<string, number>> = {};
+  for (const tx of transactions) {
+    if (tx.amount < 0 && topCats.includes(tx.category)) {
+      const m = `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, '0')}`;
+      if (!catTrendMap[m]) catTrendMap[m] = {};
+      catTrendMap[m][tx.category] = (catTrendMap[m][tx.category] ?? 0) + Math.abs(tx.amount);
+    }
+  }
+  const categoryTrend: CategoryTrendItem[] = Object.entries(catTrendMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, cats]) => ({ month, ...cats }));
+
   return res.status(200).json({
     hasData: true,
     totalIncome,
@@ -120,5 +188,8 @@ export default async function handler(
     incomeClassification,
     byCategory,
     transactionCount: transactions.length,
+    monthlyTrend,
+    topMerchants,
+    categoryTrend,
   });
 }
