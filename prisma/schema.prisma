@@ -71,6 +71,7 @@ model Transaction {
   linkedToId        String?   // Link to the duplicate/merged transaction
   isDuplicate       Boolean   @default(false)
   duplicateOfId     String?   // FK to original transaction if this is a duplicate
+  notes             String?   // User-added notes/comments
   uploadId          String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt

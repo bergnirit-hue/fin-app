@@ -12,6 +12,7 @@ export interface TransactionDTO {
   category: string;
   classification: string;
   sourceType: string;
+  notes?: string | null;
   /** Nested credit-card details (only present for expandable rows). */
   details?: TransactionDTO[];
   /** `true` when this bank row looks like a CC charge but no detail has
@@ -34,13 +35,22 @@ export default async function handler(
     return res.status(401).json({ message: 'Authentication required' });
   }
 
-  const { category, classification, startDate, endDate } = req.query;
+  const { category, classification, startDate, endDate, search } = req.query;
 
   const where: Prisma.TransactionWhereInput = {
     userId: auth.userId,
     linkedToId: null,
     isDuplicate: false,
   };
+
+  // Search in merchant name and notes
+  if (typeof search === 'string' && search.trim()) {
+    const term = search.trim();
+    where.OR = [
+      { merchant: { contains: term } },
+      { notes: { contains: term } },
+    ];
+  }
 
   if (typeof category === 'string' && category && category !== 'all') {
     where.category = category;
@@ -92,6 +102,7 @@ export default async function handler(
       category: r.category ?? 'Other',
       classification: r.classification ?? 'variable',
       sourceType: r.sourceType,
+      notes: r.notes,
     });
   }
 
@@ -108,6 +119,7 @@ export default async function handler(
       category: r.category ?? 'Other',
       classification: r.classification ?? 'variable',
       sourceType: r.sourceType,
+      notes: r.notes,
       ...(details ? { details } : {}),
       ...(looksLikeCC && !details ? { detailMissing: true } : {}),
       ...(looksLikeCC && r.description ? { cardLabel: r.description } : {}),

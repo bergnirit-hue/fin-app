@@ -11,6 +11,7 @@ interface Transaction {
   category: string;
   classification: string;
   sourceType: string;
+  notes?: string | null;
   details?: Transaction[];
   detailMissing?: boolean;
   cardLabel?: string;
@@ -34,6 +35,8 @@ export default function Transactions() {
   const [newCatName, setNewCatName] = useState('');
   const [newCatType, setNewCatType] = useState<'fixed' | 'variable' | 'savings_debt' | 'income'>('variable');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState('');
   const [sortColumn, setSortColumn] = useState<'date' | 'merchant' | 'amount' | 'category' | 'classification' | 'sourceType'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -159,6 +162,49 @@ export default function Transactions() {
     setNewCatType('variable');
   };
 
+  const startEditNote = (tx: Transaction) => {
+    setEditingNoteId(tx.id);
+    setNoteText(tx.notes || '');
+  };
+
+  const saveNote = async (id: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const res = await fetch(`/api/transactions/${id}/notes`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ notes: noteText }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+
+      setTransactions((prev) =>
+        prev.map((t) => {
+          if (t.id === id) return { ...t, notes: data.notes };
+          if (t.details) {
+            const idx = t.details.findIndex((d) => d.id === id);
+            if (idx !== -1) {
+              const updated = [...t.details];
+              updated[idx] = { ...updated[idx], notes: data.notes };
+              return { ...t, details: updated };
+            }
+          }
+          return t;
+        })
+      );
+    } catch {
+      // keep existing on failure
+    } finally {
+      setEditingNoteId(null);
+      setNoteText('');
+    }
+  };
+
   useEffect(() => {
     // On auto-exported pages the router is not ready on the first render.
     // Wait until `isReady` before reading query params or navigating.
@@ -206,12 +252,16 @@ export default function Transactions() {
     });
   };
 
-  // Merchant search is applied client-side for instant feedback; category,
-  // classification, and date filters are handled server-side by the API.
+  // Merchant + notes search is applied client-side for instant feedback;
+  // category, classification, and date filters are handled server-side by the API.
   const searched = searchQuery
-    ? transactions.filter((t) =>
-        t.merchant.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? transactions.filter((t) => {
+        const q = searchQuery.toLowerCase();
+        return (
+          t.merchant.toLowerCase().includes(q) ||
+          (t.notes && t.notes.toLowerCase().includes(q))
+        );
+      })
     : transactions;
 
   const compareTx = (a: { date: string; merchant: string; amount: number; category?: string; classification?: string; sourceType: string }, b: typeof a) => {
@@ -379,6 +429,9 @@ export default function Transactions() {
                     <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide cursor-pointer hover:text-emerald-300 transition-colors select-none" onClick={() => toggleSort('sourceType')}>
                       📍 {t('transactions.thSource')}{sortIndicator('sourceType')}
                     </th>
+                    <th className="text-start px-6 py-4 font-bold text-slate-200 uppercase text-xs tracking-wide">
+                      📝 {t('transactions.thNotes')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
@@ -478,6 +531,54 @@ export default function Transactions() {
                           <td className="px-6 py-4 text-slate-400 text-sm font-medium">
                             {tx.sourceType === 'bit' ? `${sourceLabel('bit')} (יתרה)` : sourceLabel(tx.sourceType)}
                           </td>
+                          <td className="px-6 py-4">
+                            {editingNoteId === tx.id ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={noteText}
+                                  onChange={(e) => setNoteText(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveNote(tx.id);
+                                    if (e.key === 'Escape') setEditingNoteId(null);
+                                  }}
+                                  autoFocus
+                                  className="bg-slate-700/50 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200 w-32 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                  placeholder={t('transactions.addNote')}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => saveNote(tx.id)}
+                                  className="text-emerald-400 hover:text-emerald-300 text-sm"
+                                >✓</button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingNoteId(null)}
+                                  className="text-slate-500 hover:text-slate-400 text-sm"
+                                >✕</button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => startEditNote(tx)}
+                                className={`text-sm transition-colors ${
+                                  tx.notes
+                                    ? 'text-cyan-300 hover:text-cyan-200'
+                                    : 'text-slate-600 hover:text-slate-400'
+                                }`}
+                                title={tx.notes || t('transactions.addNote')}
+                              >
+                                {tx.notes ? (
+                                  <span className="flex items-center gap-1">
+                                    <span>📝</span>
+                                    <span className="truncate max-w-[100px]">{tx.notes}</span>
+                                  </span>
+                                ) : (
+                                  <span>＋</span>
+                                )}
+                              </button>
+                            )}
+                          </td>
                         </tr>
 
                         {/* ── Expanded CC detail rows ── */}
@@ -529,6 +630,37 @@ export default function Transactions() {
                               </td>
                               <td className="px-6 py-3 text-slate-500 text-xs">
                                 {sourceLabel(d.sourceType)}
+                              </td>
+                              <td className="px-6 py-3">
+                                {editingNoteId === d.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="text"
+                                      value={noteText}
+                                      onChange={(e) => setNoteText(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') saveNote(d.id);
+                                        if (e.key === 'Escape') setEditingNoteId(null);
+                                      }}
+                                      autoFocus
+                                      className="bg-slate-700/50 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 w-28 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                      placeholder={t('transactions.addNote')}
+                                    />
+                                    <button type="button" onClick={() => saveNote(d.id)} className="text-emerald-400 text-xs">✓</button>
+                                    <button type="button" onClick={() => setEditingNoteId(null)} className="text-slate-500 text-xs">✕</button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditNote(d)}
+                                    className={`text-xs transition-colors ${d.notes ? 'text-cyan-300 hover:text-cyan-200' : 'text-slate-600 hover:text-slate-400'}`}
+                                    title={d.notes || t('transactions.addNote')}
+                                  >
+                                    {d.notes ? (
+                                      <span className="flex items-center gap-1"><span>📝</span><span className="truncate max-w-[80px]">{d.notes}</span></span>
+                                    ) : '＋'}
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           ))}
