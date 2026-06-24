@@ -1,7 +1,19 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { useI18n } from '@/lib/i18n';
+
+interface UploadRecord {
+  id: string;
+  fileName: string;
+  uploadDate: string;
+  transactionCount: number;
+  sourceType: string;
+  billingTotal: number | null;
+  cardLabel: string | null;
+  fileSize: number | null;
+  hasFile: boolean;
+}
 
 export default function Upload() {
   const router = useRouter();
@@ -14,6 +26,59 @@ export default function Upload() {
   const [preview, setPreview] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [activeTab, setActiveTab] = useState<'upload' | 'archive'>('upload');
+  const [uploads, setUploads] = useState<UploadRecord[]>([]);
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  const fetchUploads = useCallback(async () => {
+    setArchiveLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/uploads', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUploads(data);
+      }
+    } catch {
+      // silent
+    } finally {
+      setArchiveLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'archive') {
+      fetchUploads();
+    }
+  }, [activeTab, fetchUploads]);
+
+  const handleDelete = async (uploadId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/uploads/${uploadId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setUploads((prev) => prev.filter((u) => u.id !== uploadId));
+        setSuccess(t('upload.archiveDeleted'));
+      }
+    } catch {
+      setError(t('upload.error'));
+    } finally {
+      setDeleteConfirm(null);
+    }
+  };
+
+  const formatFileSize = (bytes: number | null) => {
+    if (!bytes) return '—';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   const addFiles = (newFiles: FileList | File[]) => {
     const incoming = Array.from(newFiles).filter(
@@ -163,6 +228,33 @@ export default function Upload() {
           <p className="text-slate-400 text-lg">{t('upload.subtitle')}</p>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="flex gap-2 p-1 bg-slate-800/50 rounded-xl border border-slate-700/50">
+          <button
+            type="button"
+            onClick={() => setActiveTab('upload')}
+            className={`flex-1 px-6 py-3 rounded-lg font-bold text-sm transition-all duration-300 ${
+              activeTab === 'upload'
+                ? 'bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-300 border border-emerald-500/30 shadow-lg'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'
+            }`}
+          >
+            📤 {t('upload.tabUpload')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('archive')}
+            className={`flex-1 px-6 py-3 rounded-lg font-bold text-sm transition-all duration-300 ${
+              activeTab === 'archive'
+                ? 'bg-gradient-to-r from-violet-500/20 to-cyan-500/20 text-violet-300 border border-violet-500/30 shadow-lg'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'
+            }`}
+          >
+            🗄️ {t('upload.tabArchive')}
+          </button>
+        </div>
+
+        {activeTab === 'upload' ? (
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Source Type Selection */}
           <div>
@@ -334,29 +426,155 @@ export default function Upload() {
               </span>
             )}
           </button>
-        </form>
 
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <InfoCard
-            icon="💾"
-            title={t('upload.info1Title')}
-            description={t('upload.info1Desc')}
-            color="emerald"
-          />
-          <InfoCard
-            icon="🔒"
-            title={t('upload.info2Title')}
-            description={t('upload.info2Desc')}
-            color="cyan"
-          />
-          <InfoCard
-            icon="✨"
-            title={t('upload.info3Title')}
-            description={t('upload.info3Desc')}
-            color="violet"
-          />
+          {/* Info Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <InfoCard
+              icon="💾"
+              title={t('upload.info1Title')}
+              description={t('upload.info1Desc')}
+              color="emerald"
+            />
+            <InfoCard
+              icon="🔒"
+              title={t('upload.info2Title')}
+              description={t('upload.info2Desc')}
+              color="cyan"
+            />
+            <InfoCard
+              icon="✨"
+              title={t('upload.info3Title')}
+              description={t('upload.info3Desc')}
+              color="violet"
+            />
+          </div>
+        </form>
+        ) : (
+        /* ── Archive Tab ── */
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-1">{t('upload.archiveTitle')}</h2>
+            <p className="text-slate-400 text-sm">{t('upload.archiveSub')}</p>
+          </div>
+
+          {archiveLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <span className="animate-spin text-3xl">⏳</span>
+            </div>
+          ) : uploads.length === 0 ? (
+            <div className="text-center py-16 bg-slate-800/30 rounded-2xl border border-slate-700/50">
+              <div className="text-5xl mb-4">📭</div>
+              <p className="text-slate-400 text-lg">{t('upload.archiveEmpty')}</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-slate-700/50 bg-slate-800/30 backdrop-blur">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-700/50 text-slate-400 text-xs uppercase tracking-wider">
+                    <th className="text-start px-5 py-4 font-semibold">{t('upload.archiveFile')}</th>
+                    <th className="text-start px-5 py-4 font-semibold">{t('upload.archiveDate')}</th>
+                    <th className="text-start px-5 py-4 font-semibold">{t('upload.archiveRows')}</th>
+                    <th className="text-start px-5 py-4 font-semibold">{t('upload.archiveSource')}</th>
+                    <th className="text-start px-5 py-4 font-semibold">{t('upload.archiveSize')}</th>
+                    <th className="text-end px-5 py-4 font-semibold"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/30">
+                  {uploads.map((u) => (
+                    <tr key={u.id} className="hover:bg-slate-700/20 transition-colors">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">
+                            {u.fileName.endsWith('.csv') ? '📄' : '📊'}
+                          </span>
+                          <span className="text-slate-200 font-medium truncate max-w-[200px]" title={u.fileName}>
+                            {u.fileName}
+                          </span>
+                        </div>
+                        {u.cardLabel && (
+                          <div className="text-xs text-slate-500 mt-1 truncate max-w-[200px]">{u.cardLabel}</div>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 text-slate-300">
+                        {formatDate(new Date(u.uploadDate))}
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="px-2 py-0.5 bg-cyan-500/10 text-cyan-300 text-xs font-semibold rounded-full">
+                          {u.transactionCount}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="px-2 py-0.5 bg-violet-500/10 text-violet-300 text-xs font-semibold rounded-full">
+                          {t(`sources.${u.sourceType}`)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-slate-400 text-xs">
+                        {formatFileSize(u.fileSize)}
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                          {u.hasFile ? (
+                            <a
+                              href={`/api/uploads/${u.id}`}
+                              className="px-3 py-1.5 bg-emerald-500/10 text-emerald-300 text-xs font-semibold rounded-lg hover:bg-emerald-500/20 transition-colors"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                const token = localStorage.getItem('token');
+                                fetch(`/api/uploads/${u.id}`, {
+                                  headers: { Authorization: `Bearer ${token}` },
+                                })
+                                  .then((r) => r.blob())
+                                  .then((blob) => {
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = u.fileName;
+                                    a.click();
+                                    URL.revokeObjectURL(url);
+                                  });
+                              }}
+                            >
+                              ⬇️ {t('upload.archiveDownload')}
+                            </a>
+                          ) : (
+                            <span className="text-xs text-slate-600">{t('upload.archiveNoFile')}</span>
+                          )}
+                          {deleteConfirm === u.id ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(u.id)}
+                                className="px-3 py-1.5 bg-red-500/20 text-red-300 text-xs font-semibold rounded-lg hover:bg-red-500/30 transition-colors"
+                              >
+                                ✓
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteConfirm(null)}
+                                className="px-3 py-1.5 bg-slate-600/20 text-slate-400 text-xs font-semibold rounded-lg hover:bg-slate-600/30 transition-colors"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirm(u.id)}
+                              className="px-3 py-1.5 bg-red-500/10 text-red-300 text-xs font-semibold rounded-lg hover:bg-red-500/20 transition-colors"
+                            >
+                              🗑️ {t('upload.archiveDelete')}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
+        )}
       </div>
     </>
   );
