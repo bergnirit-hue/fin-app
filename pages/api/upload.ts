@@ -341,6 +341,8 @@ export default async function handler(
         transactionCount: standaloneTx.length + ccPaidRows.length,
         ...(billingTotal != null ? { billingTotal } : {}),
         ...(cardLabel != null ? { cardLabel } : {}),
+        fileData: buffer,
+        fileSize: buffer.length,
       },
     });
 
