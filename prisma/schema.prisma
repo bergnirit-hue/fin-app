@@ -23,6 +23,7 @@ model User {
   uploads      Upload[]
   rules        CategorizationRule[]
   classifications Classification[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
@@ -35,6 +36,7 @@ model Household {
   updatedAt DateTime   @updatedAt
 
   members      HouseholdMember[]
+  invites      HouseholdInvite[]
   transactions Transaction[]
   uploads      Upload[]
   rules        CategorizationRule[]
@@ -123,6 +125,34 @@ model CategorizationRule {
   user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("categorization_rules")
+}
+
+model HouseholdInvite {
+  id          String    @id @default(cuid())
+  householdId String
+  email       String
+  invitedBy   String
+  token       String    @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@map("household_invites")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
 }
 
 model Classification {

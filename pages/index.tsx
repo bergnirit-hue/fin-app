@@ -129,26 +129,14 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
     setLoading(true);
     (async () => {
       try {
         const qs = dateRangeToQuery(fromDate, toDate);
 
-        const res = await fetch(`/api/dashboard${qs ? `?${qs}` : ''}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(`/api/dashboard${qs ? `?${qs}` : ''}`);
 
-        if (res.status === 401) {
-          localStorage.removeItem('token');
-          router.push('/login');
-          return;
-        }
+        if (!res.ok) return;
 
         const data = await res.json();
 
@@ -437,8 +425,8 @@ export default function Dashboard() {
                 />
                 <Tooltip
                   contentStyle={{ background: '#1e293b', border: '1px solid #475569', borderRadius: 12, color: '#e2e8f0' }}
-                  formatter={(value: number) => formatMoney(value)}
-                  labelFormatter={(label: string) => {
+                  formatter={(value) => formatMoney(Number(value))}
+                  labelFormatter={(label) => {
                     const [y, m] = label.split('-');
                     return `${m}/${y}`;
                   }}
@@ -491,7 +479,7 @@ export default function Dashboard() {
                 </Pie>
                 <Tooltip
                   contentStyle={{ background: '#1e293b', border: '1px solid #475569', borderRadius: 12, color: '#e2e8f0' }}
-                  formatter={(value: number) => formatMoney(value)}
+                  formatter={(value) => formatMoney(Number(value))}
                 />
                 <Legend
                   wrapperStyle={{ color: '#94a3b8', fontSize: 12 }}
@@ -546,7 +534,7 @@ export default function Dashboard() {
                 </Pie>
                 <Tooltip
                   contentStyle={{ background: '#1e293b', border: '1px solid #475569', borderRadius: 12, color: '#e2e8f0' }}
-                  formatter={(value: number) => formatMoney(value)}
+                  formatter={(value) => formatMoney(Number(value))}
                 />
                 <Legend
                   wrapperStyle={{ color: '#94a3b8', fontSize: 12 }}
@@ -629,8 +617,8 @@ export default function Dashboard() {
               />
               <Tooltip
                 contentStyle={{ background: '#1e293b', border: '1px solid #475569', borderRadius: 12, color: '#e2e8f0' }}
-                formatter={(value: number) => formatMoney(value)}
-                labelFormatter={(label: string) => {
+                formatter={(value) => formatMoney(Number(value))}
+                labelFormatter={(label) => {
                   const [y, m] = label.split('-');
                   return `${m}/${y}`;
                 }}

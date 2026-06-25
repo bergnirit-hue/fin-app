@@ -1,56 +1,48 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/utils/db';
-import { hashPassword, createToken } from '@/lib/utils/auth';
-
-interface SignupRequest {
-  email: string;
-  password: string;
-  name?: string;
-}
-
-interface SignupResponse {
-  success: boolean;
-  message: string;
-  token?: string;
-  user?: {
-    id: string;
-    email: string;
-  };
-}
+import {
+  hashPassword,
+  createToken,
+  setAuthCookie,
+  validatePasswordStrength,
+  checkRateLimit,
+} from '@/lib/utils/auth';
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<SignupResponse>
+  res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return res
-      .status(405)
-      .json({ success: false, message: 'Method not allowed' });
+    return res.status(405).json({ success: false, message: 'Method not allowed' });
   }
 
-  const { email, password, name } = req.body as SignupRequest;
+  const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+  if (!checkRateLimit(ip)) {
+    return res.status(429).json({ success: false, message: 'Too many attempts. Try again later.' });
+  }
+
+  const { email, password, name } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Email and password are required',
-    });
+    return res.status(400).json({ success: false, message: 'Email and password are required' });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ success: false, message: 'Invalid email format' });
+  }
+
+  const passwordError = validatePasswordStrength(password);
+  if (passwordError) {
+    return res.status(400).json({ success: false, message: passwordError });
   }
 
   try {
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
+    const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'User already exists',
-      });
+      return res.status(400).json({ success: false, message: 'An account with this email already exists' });
     }
 
-    // Create new user
     const user = await prisma.user.create({
       data: {
         email,
@@ -59,25 +51,17 @@ export default async function handler(
       },
     });
 
-    const token = createToken({
-      userId: user.id,
-      email: user.email,
-    });
+    const token = createToken({ userId: user.id, email: user.email });
+    setAuthCookie(res, token);
 
     return res.status(201).json({
       success: true,
       message: 'Account created successfully',
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-      },
+      user: { id: user.id, email: user.email, name: user.name },
     });
   } catch (error) {
     console.error('Signup error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred during signup',
-    });
+    return res.status(500).json({ success: false, message: 'An error occurred during signup' });
   }
 }

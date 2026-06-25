@@ -42,13 +42,9 @@ export default function Transactions() {
 
   // Load categories from API (built-in + custom)
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
     (async () => {
       try {
-        const res = await fetch('/api/categories', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch('/api/categories');
         if (res.ok) {
           const data = await res.json();
           setAllCategories(data.categories);
@@ -70,16 +66,11 @@ export default function Transactions() {
     }
 
     setEditingId(null);
-    const token = localStorage.getItem('token');
-    if (!token) return;
 
     try {
       const res = await fetch(`/api/transactions/${id}/categorize`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ category }),
       });
       if (!res.ok) return;
@@ -126,17 +117,11 @@ export default function Transactions() {
   const handleAddCategory = async () => {
     const name = newCatName.trim();
     if (!name) return;
-    const token = localStorage.getItem('token');
-    if (!token) return;
 
     try {
-      // 1. Create the category
       const catRes = await fetch('/api/categories', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, classification: newCatType }),
       });
       if (!catRes.ok) return;
@@ -168,16 +153,10 @@ export default function Transactions() {
   };
 
   const saveNote = async (id: string) => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
     try {
       const res = await fetch(`/api/transactions/${id}/notes`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes: noteText }),
       });
       if (!res.ok) return;
@@ -210,12 +189,6 @@ export default function Transactions() {
     // Wait until `isReady` before reading query params or navigating.
     if (!router.isReady) return;
 
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
     const params = new URLSearchParams();
     if (selectedCategory !== 'all') params.set('category', selectedCategory);
     if (classificationFilter !== 'all')
@@ -225,14 +198,8 @@ export default function Transactions() {
 
     (async () => {
       try {
-        const res = await fetch(`/api/transactions?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.status === 401) {
-          localStorage.removeItem('token');
-          router.push('/login');
-          return;
-        }
+        const res = await fetch(`/api/transactions?${params.toString()}`);
+        if (!res.ok) return;
         const data = await res.json();
         setTransactions(data.transactions ?? []);
       } catch {

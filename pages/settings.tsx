@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { useI18n } from '@/lib/i18n';
+import { useAuth } from './_app';
 
 interface CategoryItem {
   id?: string;
@@ -22,9 +23,12 @@ export default function Settings() {
   const router = useRouter();
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState('general');
-  const [showHouseholdForm, setShowHouseholdForm] = useState(false);
-  const [householdCode, setHouseholdCode] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
+  const [household, setHousehold] = useState<any>(null);
+  const [householdLoading, setHouseholdLoading] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState('');
+  const [inviteError, setInviteError] = useState('');
+  const [inviteToken, setInviteToken] = useState('');
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [rules, setRules] = useState<RuleItem[]>([]);
   const [showAddRuleModal, setShowAddRuleModal] = useState(false);
@@ -34,31 +38,11 @@ export default function Settings() {
   const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);
   const [categoryFormName, setCategoryFormName] = useState('');
   const [categoryFormClassification, setCategoryFormClassification] = useState('variable');
-  const [user, setUser] = useState<any>(null);
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    // Decode user from token
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      setUser(payload);
-    } catch (e) {
-      console.error('Invalid token');
-    }
-  }, [router]);
+  const { user } = useAuth();
 
   const loadCategories = useCallback(async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
     try {
-      const res = await fetch('/api/categories', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch('/api/categories');
       if (res.ok) {
         const data = await res.json();
         setCategories(data.categories);
@@ -67,12 +51,8 @@ export default function Settings() {
   }, []);
 
   const loadRules = useCallback(async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
     try {
-      const res = await fetch('/api/rules', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch('/api/rules');
       if (res.ok) {
         const data = await res.json();
         setRules(data.rules);
@@ -80,10 +60,24 @@ export default function Settings() {
     } catch {}
   }, []);
 
+  const loadHousehold = useCallback(async () => {
+    setHouseholdLoading(true);
+    try {
+      const res = await fetch('/api/household');
+      if (res.ok) {
+        const data = await res.json();
+        setHousehold(data.household);
+      }
+    } catch {} finally {
+      setHouseholdLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (activeTab === 'categories') loadCategories();
     if (activeTab === 'rules') loadRules();
-  }, [activeTab, loadCategories, loadRules]);
+    if (activeTab === 'household') loadHousehold();
+  }, [activeTab, loadCategories, loadRules, loadHousehold]);
 
   const openAddCategory = () => {
     setEditingCategory(null);
@@ -102,14 +96,12 @@ export default function Settings() {
   const handleSaveCategory = async () => {
     const name = categoryFormName.trim();
     if (!name || !categoryFormClassification) return;
-    const token = localStorage.getItem('token');
-    if (!token) return;
 
     try {
       if (editingCategory?.isCustom && editingCategory.id) {
         const res = await fetch(`/api/categories/${editingCategory.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, classification: categoryFormClassification }),
         });
         if (res.ok) {
@@ -121,7 +113,7 @@ export default function Settings() {
       } else {
         const res = await fetch('/api/categories', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, classification: categoryFormClassification }),
         });
         if (res.ok) {
@@ -141,12 +133,9 @@ export default function Settings() {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
     try {
       const res = await fetch(`/api/categories/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         setCategories((prev) => prev.filter((c) => c.id !== id));
@@ -155,12 +144,9 @@ export default function Settings() {
   };
 
   const handleDeleteRule = async (id: string) => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
     try {
       const res = await fetch(`/api/rules/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         setRules((prev) => prev.filter((r) => r.id !== id));
@@ -172,15 +158,10 @@ export default function Settings() {
     const merchant = newRuleMerchant.trim();
     const category = newRuleCategory.trim();
     if (!merchant || !category) return;
-    const token = localStorage.getItem('token');
-    if (!token) return;
     try {
       const res = await fetch('/api/rules', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ merchantPattern: merchant, targetCategory: category }),
       });
       if (res.ok) {
@@ -195,9 +176,44 @@ export default function Settings() {
 
   const handleInviteSpouse = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Inviting', inviteEmail);
-    setInviteEmail('');
-    // TODO: Implement household invite logic
+    setInviteError('');
+    setInviteSuccess('');
+    setInviteToken('');
+
+    try {
+      const res = await fetch('/api/household/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setInviteError(data.message);
+        return;
+      }
+      setInviteSuccess(t('settings.inviteSent'));
+      if (data.invite?.token) {
+        setInviteToken(data.invite.token);
+      }
+      setInviteEmail('');
+      loadHousehold();
+    } catch {
+      setInviteError(t('settings.inviteError'));
+    }
+  };
+
+  const handleLeaveHousehold = async () => {
+    try {
+      const res = await fetch('/api/household/leave', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setInviteError(data.message);
+        return;
+      }
+      setHousehold(null);
+    } catch {
+      setInviteError(t('settings.inviteError'));
+    }
   };
 
   return (
@@ -297,6 +313,7 @@ export default function Settings() {
             {/* Household Settings */}
             {activeTab === 'household' && (
               <div className="space-y-6">
+                {/* Invite Section */}
                 <div className="bg-gradient-to-br from-emerald-600/20 to-emerald-600/5 backdrop-blur border border-emerald-500/30 rounded-2xl p-8 shadow-lg">
                   <h3 className="text-2xl font-bold text-white mb-3 flex items-center gap-2">
                     <span>👥</span> {t('settings.inviteTitle')}
@@ -317,6 +334,28 @@ export default function Settings() {
                         required
                       />
                     </div>
+
+                    {inviteError && (
+                      <div className="bg-rose-600/20 border border-rose-500/50 text-rose-200 px-4 py-3 rounded-lg text-sm">
+                        {inviteError}
+                      </div>
+                    )}
+
+                    {inviteSuccess && (
+                      <div className="bg-emerald-600/20 border border-emerald-500/50 text-emerald-200 px-4 py-3 rounded-lg text-sm">
+                        {inviteSuccess}
+                      </div>
+                    )}
+
+                    {inviteToken && (
+                      <div className="bg-slate-600/50 border border-slate-500/50 rounded-lg p-4 space-y-2">
+                        <p className="text-xs text-slate-400 text-center">{t('settings.devInviteNote')}</p>
+                        <p className="text-emerald-400 text-sm text-center font-mono break-all">
+                          {typeof window !== 'undefined' ? `${window.location.origin}/join?token=${inviteToken}` : ''}
+                        </p>
+                      </div>
+                    )}
+
                     <button
                       type="submit"
                       className="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
@@ -326,15 +365,83 @@ export default function Settings() {
                   </form>
                 </div>
 
+                {/* Members Section */}
                 <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/30 backdrop-blur border border-slate-600/50 rounded-2xl p-8 shadow-lg">
                   <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
                     <span>👫</span> {t('settings.membersTitle')}
                   </h3>
-                  <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600/50">
-                    <p className="text-slate-400 text-center py-6">
-                      📌 {t('settings.membersEmpty')}
-                    </p>
-                  </div>
+
+                  {householdLoading ? (
+                    <p className="text-slate-400 text-center py-6">{t('common.loading')}</p>
+                  ) : !household ? (
+                    <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600/50">
+                      <p className="text-slate-400 text-center py-6">
+                        📌 {t('settings.membersEmpty')}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {household.members.map((member: any) => (
+                        <div
+                          key={member.userId}
+                          className="flex items-center justify-between p-4 bg-slate-700/50 rounded-xl border border-slate-600/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold">
+                              {(member.name || member.email)[0].toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-white font-semibold">
+                                {member.name || member.email}
+                                {member.userId === user?.userId && (
+                                  <span className="text-xs text-slate-400 ms-2">({t('settings.you')})</span>
+                                )}
+                              </p>
+                              <p className="text-slate-400 text-sm">{member.email}</p>
+                            </div>
+                          </div>
+                          <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                            member.role === 'admin'
+                              ? 'bg-amber-500/20 text-amber-300'
+                              : 'bg-slate-600/50 text-slate-300'
+                          }`}>
+                            {member.role === 'admin' ? t('settings.roleAdmin') : t('settings.roleMember')}
+                          </span>
+                        </div>
+                      ))}
+
+                      {household.pendingInvites?.length > 0 && (
+                        <>
+                          <p className="text-sm font-semibold text-slate-400 mt-4">{t('settings.pendingInvites')}</p>
+                          {household.pendingInvites.map((inv: any) => (
+                            <div
+                              key={inv.id}
+                              className="flex items-center justify-between p-4 bg-slate-700/50 rounded-xl border border-slate-600/50 border-dashed"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-slate-600 rounded-full flex items-center justify-center text-slate-400 font-bold">
+                                  ?
+                                </div>
+                                <div>
+                                  <p className="text-slate-300">{inv.email}</p>
+                                  <p className="text-slate-500 text-xs">{t('settings.pendingLabel')}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {household.myRole === 'member' && (
+                        <button
+                          onClick={handleLeaveHousehold}
+                          className="w-full mt-4 px-6 py-3 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 rounded-xl font-semibold transition-all"
+                        >
+                          {t('settings.leaveHousehold')}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

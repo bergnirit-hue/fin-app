@@ -34,10 +34,7 @@ export default function Upload() {
   const fetchUploads = useCallback(async () => {
     setArchiveLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/uploads', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch('/api/uploads');
       if (res.ok) {
         const data = await res.json();
         setUploads(data);
@@ -57,10 +54,8 @@ export default function Upload() {
 
   const handleDelete = async (uploadId: string) => {
     try {
-      const token = localStorage.getItem('token');
       const res = await fetch(`/api/uploads/${uploadId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         setUploads((prev) => prev.filter((u) => u.id !== uploadId));
@@ -143,8 +138,6 @@ export default function Upload() {
     const errors: string[] = [];
 
     try {
-      const token = localStorage.getItem('token');
-
       for (const file of files) {
         const formData = new FormData();
         formData.append('file', file);
@@ -152,7 +145,6 @@ export default function Upload() {
 
         const response = await fetch('/api/upload', {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
           body: formData,
         });
 
@@ -519,10 +511,7 @@ export default function Upload() {
                               className="px-3 py-1.5 bg-emerald-500/10 text-emerald-300 text-xs font-semibold rounded-lg hover:bg-emerald-500/20 transition-colors"
                               onClick={(e) => {
                                 e.preventDefault();
-                                const token = localStorage.getItem('token');
-                                fetch(`/api/uploads/${u.id}`, {
-                                  headers: { Authorization: `Bearer ${token}` },
-                                })
+                                fetch(`/api/uploads/${u.id}`)
                                   .then((r) => r.blob())
                                   .then((blob) => {
                                     const url = URL.createObjectURL(blob);

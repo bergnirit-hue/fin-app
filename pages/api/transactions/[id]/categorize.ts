@@ -7,7 +7,7 @@ import type { TransactionDTO } from '../index';
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<{ transaction: TransactionDTO } | { message: string }>
+  res: NextApiResponse<{ transaction: TransactionDTO; bulkUpdated?: number } | { message: string }>
 ) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
