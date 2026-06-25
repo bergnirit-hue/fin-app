@@ -30,8 +30,13 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+
+# sqlite (dev legacy)
+prisma/dev.db
+prisma/dev.db-journal
+prisma/sqlite-backup.sql
 
 # vercel
 .vercel
