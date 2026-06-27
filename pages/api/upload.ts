@@ -107,10 +107,13 @@ export default async function handler(
 
         if (!mapping) {
           console.error('Upload: column detection failed. Headers:', fileHeaders);
+          const headerHint = fileHeaders.length > 0
+            ? ` Detected columns: ${fileHeaders.slice(0, 8).join(', ')}${fileHeaders.length > 8 ? '…' : ''}`
+            : '';
           return res.status(400).json({
             success: false,
             message:
-              'Could not auto-detect columns. Please check the file format.',
+              `Could not auto-detect columns. Please check the file format.${headerHint}`,
             transactions: [],
           });
         }
@@ -164,10 +167,13 @@ export default async function handler(
         fileHeaders = result.data[0] ? Object.keys(result.data[0] as any) : [];
         if (!mapping) {
           console.error('Upload: column detection failed. Headers:', fileHeaders);
+          const headerHint = fileHeaders.length > 0
+            ? ` Detected columns: ${fileHeaders.slice(0, 8).join(', ')}${fileHeaders.length > 8 ? '…' : ''}`
+            : '';
           return res.status(400).json({
             success: false,
             message:
-              'Could not auto-detect columns. Please check the file format.',
+              `Could not auto-detect columns. Please check the file format.${headerHint}`,
             transactions: [],
           });
         }

@@ -410,9 +410,9 @@ export class TransactionParser {
       return h;
     };
 
-    const dateColumn = find(/date|תאריך/i);
+    const dateColumn = find(/date|תאריך|תאריך עסקה|תאריך חיוב/i);
     const merchantColumn = find(
-      /merchant|description|vendor|payee|narrative|הפעולה|תיאור|שם|פרטים|לטובת/i
+      /merchant|description|vendor|payee|narrative|הפעולה|תיאור|שם בית.?עסק|שם|פרטים|לטובת|מוטב/i
     );
     const debitColumn = find(/^debit$|חובה/i);
     const creditColumn = find(/^credit$|זכות/i);

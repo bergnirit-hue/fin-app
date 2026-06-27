@@ -318,7 +318,7 @@ export default function Transactions() {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-5 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
+            className="px-5 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition [color-scheme:dark] [&>option]:bg-slate-800 [&>option]:text-white"
           >
             {filterCategories.map((cat) => (
               <option key={cat} value={cat}>
@@ -337,7 +337,7 @@ export default function Transactions() {
                 e.target.value as 'all' | 'fixed' | 'variable' | 'savings_debt' | 'income'
               )
             }
-            className="px-5 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
+            className="px-5 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition [color-scheme:dark] [&>option]:bg-slate-800 [&>option]:text-white"
           >
             <option value="all">🔹 {t('transactions.allTypes')}</option>
             <option value="income">💰 {t('transactions.income')}</option>
@@ -458,7 +458,7 @@ export default function Transactions() {
                           </td>
                           <td className="px-6 py-4">
                             {expandable ? (
-                              <span className="text-slate-500 text-xs">&mdash;</span>
+                              <span className="text-slate-500 text-xs italic">{t('transactions.seeCharges')}</span>
                             ) : editingId === tx.id ? (
                               <select
                                 autoFocus
@@ -467,7 +467,7 @@ export default function Transactions() {
                                   handleCategorize(tx.id, e.target.value)
                                 }
                                 onBlur={() => setTimeout(() => setEditingId(null), 150)}
-                                className="px-3 py-2 bg-slate-700 border border-emerald-500/50 rounded-lg text-emerald-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                                className="px-3 py-2 bg-slate-700 border border-emerald-500/50 rounded-lg text-emerald-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark] [&>option]:bg-slate-800 [&>option]:text-white"
                               >
                                 {categoryNames.filter((c) => c !== 'Other').map((c) => (
                                   <option key={c} value={c}>
@@ -490,7 +490,7 @@ export default function Transactions() {
                           </td>
                           <td className="px-6 py-4">
                             {expandable ? (
-                              <span className="text-slate-500 text-xs">&mdash;</span>
+                              <span className="text-slate-500 text-xs italic">{t('transactions.seeCharges')}</span>
                             ) : (
                               <ClassificationBadge classification={tx.classification} t={t} />
                             )}
@@ -571,7 +571,7 @@ export default function Transactions() {
                                     value={d.category}
                                     onChange={(e) => handleCategorize(d.id, e.target.value)}
                                     onBlur={() => setTimeout(() => setEditingId(null), 150)}
-                                    className="px-2 py-1 bg-slate-700 border border-emerald-500/50 rounded-lg text-emerald-100 text-[10px] font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                                    className="px-2 py-1 bg-slate-700 border border-emerald-500/50 rounded-lg text-emerald-100 text-[10px] font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark] [&>option]:bg-slate-800 [&>option]:text-white"
                                   >
                                     {categoryNames.filter((c) => c !== 'Other').map((c) => (
                                       <option key={c} value={c}>
@@ -777,8 +777,8 @@ function ClassificationBadge({
   }
 
   return (
-    <span className={`px-4 py-2 text-xs font-semibold rounded-full ${c.bg} ${c.text}`}>
-      {c.icon} {c.label}
+    <span className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap ${c.bg} ${c.text}`}>
+      <span>{c.icon}</span> {c.label}
     </span>
   );
 }

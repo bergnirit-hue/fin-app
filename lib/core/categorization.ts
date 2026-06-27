@@ -14,7 +14,7 @@ export const DEFAULT_RULES: CategorizationRule[] = [
   // ── Utilities (חשבונות שוטפים) ──
   { pattern: /electric|water|gas|internet|phone|utility|verizon|at&t|comcast|bill/i, category: 'Utilities' },
   { pattern: /חברת החשמל|תאגיד המים|מי אביבים|בזק|פרטנר|סלקום|הוט|yes|גולן טלקום|פלאפון/i, category: 'Utilities' },
-  { pattern: /ארנונה|גז /i, category: 'Utilities' },
+  { pattern: /ארנונה|גז |עירי|רשל"צ|רשות מקומית|עיריי|מסים/i, category: 'Utilities' },
 
   // ── Transportation (תחבורה והחזקת רכב) ──
   { pattern: /uber|lyft|taxi|parking|gas station|shell|chevron|exxon|bp|vehicle|car wash|car insurance/i, category: 'Transportation' },
@@ -73,6 +73,10 @@ export const DEFAULT_RULES: CategorizationRule[] = [
   // ── Debt Repayment (החזר חובות) ──
   { pattern: /loan repayment|debt payment|credit card payment/i, category: 'Debt Repayment' },
   { pattern: /החזר הלוואה|מינוס|החזר חוב/i, category: 'Debt Repayment' },
+
+  // ── Transfers & payments (העברות) ──
+  { pattern: /bit|פייבוקס|paybox|ביט/i, category: 'Other' },
+  { pattern: /העברה|העברת כספים|מקס איט|maxIt/i, category: 'Other' },
 ];
 
 export class CategorizationEngine {
